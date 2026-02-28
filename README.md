@@ -134,8 +134,14 @@ curl -X POST https://example.com/admin/fm.php \
    scp db.php fm.php user@example.com:/var/www/html/admin/
    ```
 
-3. **Configure (Optional)**
-   Create `.env` file in the same directory as `db.php` and `fm.php`:
+3. **Configure Environment**
+   - **⚠️ IMPORTANT**: Copy `.env.example` to `.env` and **fill in the real values**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your actual database credentials and secure passwords
+   ```
+
+   Example `.env` file:
    ```ini
    # ServerLuxe Configuration
    APP_NAME=ServerLuxe
@@ -156,6 +162,8 @@ curl -X POST https://example.com/admin/fm.php \
    DB_FILE=db.php
    FM_FILE=fm.php
    ```
+
+   **Security Note**: Never commit `.env` to version control. Always use `.env.example` as a template and fill in your actual credentials locally.
 
 4. **Access in browser**
    - Database Manager: `https://yourdomain.com/admin/db.php`
