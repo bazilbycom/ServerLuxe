@@ -1,0 +1,13 @@
+{
+  "appId": "com.bycomsolutions.bazilbycom.serverluxe.github",
+  "appName": "ServerLuxe",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "DARK",
+      "backgroundColor": "#1E293B"
+    }
+  }
+}

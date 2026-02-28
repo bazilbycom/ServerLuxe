@@ -1,0 +1,21 @@
+{
+    "name": "serverluxe",
+    "version": "1.0.0",
+    "description": "ServerLuxe Mobile Client",
+    "main": "index.js",
+    "scripts": {
+        "build": "echo 'No build step required'",
+        "sync": "npx cap sync"
+    },
+    "dependencies": {
+        "@capacitor/android": "^5.0.0",
+        "@capacitor/app": "^5.0.8",
+        "@capacitor/core": "^5.0.0",
+        "@capacitor/haptics": "^5.0.8",
+        "@capacitor/status-bar": "^5.0.8",
+        "cordova-plugin-fingerprint-aio": "^6.0.1"
+    },
+    "devDependencies": {
+        "@capacitor/cli": "^5.0.0"
+    }
+}

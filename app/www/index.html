@@ -1,0 +1,1502 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1E293B">
+    <title>ServerLuxe</title>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-elevated: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #22d3ee;
+            --danger: #ef4444;
+            --success: #10b981;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .safe-area-inset {
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .app-header {
+            padding: 1.25rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .main-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+            padding-bottom: 5rem;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+            width: 100%;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 0.4rem 0.6rem;
+            font-size: 0.65rem;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-edit {
+            background: rgba(34, 211, 238, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+            padding: 0.4rem 0.6rem;
+            font-size: 0.65rem;
+            letter-spacing: 0.05em;
+            margin-right: 0.5rem;
+        }
+
+        .input-control {
+            width: 100%;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            color: #fff;
+            font-family: inherit;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .input-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .server-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: flex;
+            align-items: flex-end;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-card {
+            background: var(--bg-surface);
+            width: 100%;
+            border-radius: 1.5rem 1.5rem 0 0;
+            padding: 2rem;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-enter {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .modal-leave {
+            animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(0);
+            }
+
+            to {
+                transform: translateY(100%);
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.4rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 700;
+            font-size: 0.7rem;
+            font-family: inherit;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-elevated);
+            color: var(--accent);
+        }
+
+        .badge {
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.4rem;
+            text-transform: uppercase;
+        }
+
+        .badge-accent {
+            background: rgba(34, 211, 238, 0.1);
+            color: var(--accent);
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            background: var(--bg-elevated);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            font-size: 0.6rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        tr:active {
+            background: rgba(34, 211, 238, 0.05);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body x-data="mobileApp">
+
+    <header class="app-header safe-area-inset">
+        <div class="flex items-center gap-2">
+            <h1 @click="window.location.href='https://bycomsolutions.com'"
+                style="font-size: 1.25rem; font-weight: 800; color: var(--accent); cursor: pointer;">SQLuxe</h1>
+            <template x-if="currentServer">
+                <span class="badge badge-accent" x-text="currentServer.name"></span>
+                <span style="font-size: 0.6rem; opacity: 0.4; margin-left: 0.5rem;">v1.1.2</span>
+            </template>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button onclick="switchApp('fm.html')" class="btn btn-ghost" style="padding: 0.5rem;"
+                title="Switch to File Manager">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+            <button @click="showProcessList = !showProcessList" class="btn btn-ghost" style="padding: 0.5rem;"
+                title="Process List">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+            </button>
+            <button @click="openServerManager = true" class="btn btn-ghost" style="padding: 0.5rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="main-scroll" @scroll="handleScroll">
+        <!-- Dashboard / Connect Screen -->
+        <template x-if="!currentServer">
+            <div>
+                <div style="margin-bottom: 2rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 style="font-weight: 800; font-size: 1.25rem;">Saved Nodes</h2>
+                        <button @click="openServerManager = true" class="btn btn-ghost"
+                            style="padding: 0.4rem 0.6rem; font-size: 0.65rem; color: var(--accent);">MANAGE
+                            ALL</button>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <button
+                            @click="tempServer = { name: '', url: '', apiKey: '', protocol: 'https://', domainUrl: '' }; showAddServer = true; openServerManager = false"
+                            class="btn btn-primary" style="flex: 2; font-size: 0.8rem; height: 3.5rem;">+ NEW
+                            CONNECTION</button>
+                        <button @click="startQRScanner" class="btn btn-primary"
+                            style="flex: 1; background: #22d3ee; color: #000; height: 3.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                                <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                                <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                                <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                                <path d="M7 7h10v10H7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button @click="exportNodes" class="btn btn-ghost"
+                            style="flex: 1; font-size: 0.7rem; padding: 0.5rem;">EXPORT</button>
+                        <button @click="$refs.importInput.click()" class="btn btn-ghost"
+                            style="flex: 1; font-size: 0.7rem; padding: 0.5rem;">IMPORT</button>
+                        <input type="file" x-ref="importInput" @change="importNodes" style="display:none;"
+                            accept=".json">
+                    </div>
+                </div>
+
+
+                <template x-if="servers.length === 0">
+                    <div style="text-align: center; padding-top: 4rem;">
+                        <div
+                            style="width: 80px; height: 80px; background: rgba(34, 211, 238, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; color: var(--accent);">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="16 16 12 12 8 16"></polyline>
+                                <line x1="12" y1="12" x2="12" y2="21"></line>
+                                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+                                <polyline points="16 16 12 12 8 16"></polyline>
+                            </svg>
+                        </div>
+                        <h2 style="font-weight: 800; margin-bottom: 0.5rem;">Ready to Connect</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 2rem;">Add your first SQL server to get
+                            started.</p>
+                    </div>
+                </template>
+
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <template x-for="(s, idx) in servers">
+                        <div class="card"
+                            style="padding: 1rem; margin-bottom: 0; border-left: 4px solid var(--accent); cursor:pointer;"
+                            @click="selectServer(s)">
+                            <div style="font-weight: 800; font-size: 1.1rem; color: #fff;" x-text="s.name"></div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace; opacity: 0.7;"
+                                x-text="s.url"></div>
+                            <div
+                                style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                                <button @click.stop="editServer(idx)" class="btn btn-ghost"
+                                    style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; color: var(--accent); border-color: rgba(34,211,238,0.3);">
+                                    EDIT
+                                </button>
+                                <button @click.stop="removeServer(idx)" class="btn btn-ghost"
+                                    style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; color: #ff6b6b; border-color: rgba(239,68,68,0.3);">
+                                    REMOVE
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div style="margin-top:2rem;">
+                    <button
+                        @click="tempServer = { name: '', url: '', apiKey: '', host: '127.0.0.1', port: '3306', username: '', password: '', database: '' }; editingServerIdx = null; showAddServer = true"
+                        class="btn btn-primary">+ ADD SERVER</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- Process List View -->
+        <template x-if="currentServer && showProcessList">
+            <div x-cloak>
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <button @click="showProcessList = false" class="btn btn-ghost"
+                        style="padding: 0.5rem; border:none;"><svg width="24" height="24" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg></button>
+                    <h2 style="font-weight: 800; font-size: 1.25rem;">Server Activity</h2>
+                </div>
+                <div x-show="loading" style="text-align: center; padding: 2rem;">
+                    <div class="spinner animate-spin"
+                        style="width: 24px; height: 24px; border: 3px solid rgba(34,211,238,0.2); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto;">
+                    </div>
+                </div>
+                <template x-for="proc in processes">
+                    <div class="card" style="padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.65rem; font-weight: 800; color: var(--accent);"
+                                    x-text="'ID: ' + proc.Id"></div>
+                                <div style="font-weight: 700;" x-text="proc.User + '@' + proc.Host"></div>
+                            </div>
+                            <div class="badge" :class="proc.Command === 'Query' ? 'badge-accent' : ''"
+                                style="background: rgba(255,255,255,0.05);" x-text="proc.Command"></div>
+                        </div>
+                        <div style="margin-top: 0.75rem; font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.5rem;"
+                            x-text="proc.Info || 'Idle'"></div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <!-- Main Home (Table List & Console) -->
+        <template x-if="currentServer && !selectedTable && !showProcessList">
+            <div>
+                <div class="tabs">
+                    <button @click="homeTab = 'tables'" :class="homeTab === 'tables' ? 'active' : ''"
+                        class="tab-btn">TABLES</button>
+                    <button @click="homeTab = 'console'" :class="homeTab === 'console' ? 'active' : ''"
+                        class="tab-btn">CONSOLE</button>
+                    <button @click="homeTab = 'history'" :class="homeTab === 'history' ? 'active' : ''"
+                        class="tab-btn">HISTORY</button>
+                </div>
+
+                <div x-show="homeTab === 'tables'">
+                    <div class="card" style="padding: 0.75rem;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.25rem;">
+                            <label style="font-size: 0.65rem; font-weight: 800; color: var(--text-secondary);"
+                                x-text="currentServer.database ? 'TABLES' : 'DATABASES'"></label>
+
+                            <template x-if="currentServer.database">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span
+                                        style="font-size: 0.65rem; font-weight: 800; color: var(--accent); background: rgba(34,211,238,0.1); padding: 0.1rem 0.4rem; border-radius: 0.25rem;"
+                                        x-text="currentServer.database"></span>
+                                    <button
+                                        @click="currentServer.database = ''; selectTable({Name: '', is_database: true})"
+                                        class="btn btn-ghost"
+                                        style="padding: 0; font-size: 0.55rem; border: none; opacity: 0.5;">UNSET</button>
+                                </div>
+                            </template>
+                        </div>
+                        <input type="text" class="input-control" style="margin-bottom: 0;"
+                            :placeholder="currentServer.database ? 'Search tables...' : 'Search databases...'"
+                            x-model="tableSearch">
+                    </div>
+
+                    <div x-show="loading" style="text-align: center; padding: 2rem;">
+                        <div class="spinner animate-spin"
+                            style="width: 24px; height: 24px; border: 3px solid rgba(34,211,238,0.2); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto;">
+                        </div>
+                    </div>
+
+                    <div x-show="!loading" x-cloak>
+                        <template x-for="item in filteredTables">
+                            <div class="server-item" @click="selectTable(item)">
+                                <div class="flex flex-col">
+                                    <span style="font-weight: 700;"
+                                        x-text="typeof item === 'string' ? item : item.Name"></span>
+                                    <template x-if="typeof item === 'object' && item.is_database">
+                                        <div
+                                            style="font-size: 0.55rem; color: var(--accent); font-weight: 800; margin-top: 0.2rem; letter-spacing: 0.05em;">
+                                            DATABASE</div>
+                                    </template>
+                                </div>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" style="opacity: 0.3;">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </div>
+                        </template>
+
+                        <template x-if="tables.length === 0 && !loading">
+                            <div style="text-align: center; padding: 3rem 1rem; opacity: 0.5;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5" style="margin: 0 auto 1rem; display: block;">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                <div style="font-weight: 800; font-size: 0.9rem;">No Tables Found</div>
+                                <p style="font-size: 0.75rem; margin-top: 0.5rem;">Check your database connection or
+                                    selected DB.</p>
+                                <button @click="fetchTables" class="btn btn-ghost"
+                                    style="margin-top: 1.5rem; border: 1px solid var(--border); width: auto; padding: 0.5rem 1.5rem;">RETRY
+                                    FETCH</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="homeTab === 'console'" x-cloak>
+                    <div class="card" style="padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <h3 style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">SQL QUERY
+                            </h3>
+                            <button @click="showSnippets = true" class="badge badge-accent"
+                                style="border:none; cursor:pointer;">SNIPPETS</button>
+                        </div>
+                        <textarea class="input-control"
+                            style="font-family: monospace; height: 160px; font-size: 0.85rem;" x-model="sqlQuery"
+                            placeholder="SELECT * FROM users LIMIT 10..."></textarea>
+                        <button @click="executeSQL" class="btn btn-primary" :disabled="loading">
+                            <span x-show="!loading">RUN QUERY</span>
+                            <div x-show="loading" class="spinner animate-spin"
+                                style="width: 14px; height: 14px; border: 2px solid #000; border-top-color: transparent; border-radius: 50%;">
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div x-show="homeTab === 'history'" x-cloak>
+                    <template x-for="(h, idx) in history">
+                        <div class="card" style="padding: 1rem; cursor: pointer;"
+                            @click="sqlQuery = h; homeTab = 'console'">
+                            <div style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                                x-text="h"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- Table Data View -->
+        <template x-if="selectedTable && !showProcessList">
+            <div x-cloak>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <button @click="selectedTable = null" class="btn btn-ghost"
+                            style="padding: 0.5rem; border: none;"><svg width="24" height="24" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg></button>
+                        <div>
+                            <h2 style="font-weight: 800; font-size: 1.25rem; line-height: 1;" x-text="selectedTable">
+                            </h2>
+                            <span style="font-size: 0.6rem; color: var(--text-secondary); font-weight: 700;"
+                                x-text="(tableData.meta?.total_rows || 0) + ' ROWS'"></span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button @click="openInsertModal" class="btn btn-primary"
+                            style="padding: 0.5rem; width: auto; font-size: 0.7rem;">+ NEW</button>
+                        <button @click="showTableActions = true" class="btn btn-ghost" style="padding: 0.5rem;"><svg
+                                width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="12" cy="5" r="1"></circle>
+                                <circle cx="12" cy="19" r="1"></circle>
+                            </svg></button>
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" class="input-control" style="margin-bottom: 0; flex: 1;"
+                            placeholder="Search in table..." x-model="searchQuery" @keyup.enter="fetchTableData">
+                        <button @click="fetchTableData" class="btn btn-ghost" style="padding: 0.5rem;"><svg width="18"
+                                height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg></button>
+                    </div>
+                </div>
+
+                <div x-show="loading" style="text-align: center; padding: 2rem;">
+                    <div class="spinner animate-spin"
+                        style="width: 24px; height: 24px; border: 3px solid rgba(34,211,238,0.2); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto;">
+                    </div>
+                </div>
+
+                <div x-show="!loading" style="padding-bottom: 2rem;">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <template x-for="col in tableData.columns">
+                                        <th x-text="col.Field"></th>
+                                    </template>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="row in tableData.rows">
+                                    <tr @click="inspectRow(row)">
+                                        <template x-for="col in tableData.columns">
+                                            <td x-text="row[col.Field]"></td>
+                                        </template>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mobile Pagination -->
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem;">
+                        <button class="btn btn-ghost" @click="page--; fetchTableData()" :disabled="page <= 1"
+                            :style="page <= 1 ? 'opacity: 0.3' : ''">PREV</button>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.75rem; font-weight: 800;">PAGE <span x-text="page"></span></div>
+                            <div style="font-size: 0.6rem; color: var(--text-secondary);"
+                                x-text="'of ' + tableData.meta?.last_page"></div>
+                        </div>
+                        <button class="btn btn-ghost" @click="page++; fetchTableData()"
+                            :disabled="page >= tableData.meta?.last_page"
+                            :style="page >= tableData.meta?.last_page ? 'opacity: 0.3' : ''">NEXT</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <div style="text-align: center; padding: 2rem; opacity: 0.3;">
+            <img src="https://bycomsolutions.com/_astro/logo.Bz8u1fa6_Z2e3zIX.webp"
+                style="width: 120px; filter: grayscale(1) brightness(2);">
+        </div>
+    </main>
+
+    <!-- Modals Fleet -->
+
+    <!-- 1. Add/Edit Server -->
+    <div class="modal-overlay" x-show="showAddServer" x-cloak @click.self="showAddServer = false">
+        <div class="modal-card" x-show="showAddServer" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 1.5rem;"
+                x-text="editingServerIdx !== null ? 'Modify connection' : 'Add SQL Server'"></h2>
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">NODE LABEL</label>
+            <input type="text" class="input-control" placeholder="Production, Local..." x-model="tempServer.name">
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">ENDPOINT (db.php)</label>
+            <div style="display: flex; gap: 0; margin-bottom: 1rem;">
+                <select class="input-control" x-model="tempServer.protocol"
+                    style="width: 35%; border-radius: 0.75rem 0 0 0.75rem; border-right: none; margin-bottom: 0;">
+                    <option value="https://">https://</option>
+                    <option value="http://">http://</option>
+                </select>
+                <input type="text" class="input-control" placeholder="site.com/db.php" x-model="tempServer.domainUrl"
+                    style="width: 65%; border-radius: 0 0.75rem 0.75rem 0; margin-bottom: 0;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">HOST</label>
+                    <input type="text" class="input-control" placeholder="127.0.0.1" x-model="tempServer.host">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">PORT</label>
+                    <input type="text" class="input-control" placeholder="3306" x-model="tempServer.port">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">USER</label>
+                    <input type="text" class="input-control" x-model="tempServer.username">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">DATABASE</label>
+                    <input type="text" class="input-control" placeholder="optional" x-model="tempServer.database">
+                </div>
+            </div>
+
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">DB PASSWORD</label>
+            <input type="password" class="input-control" x-model="tempServer.password">
+
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">SECRET API KEY</label>
+            <input type="password" class="input-control" placeholder="Only if required by server"
+                x-model="tempServer.apiKey">
+
+            <div
+                style="background: rgba(34, 211, 238, 0.05); padding: 0.75rem; border-radius: 0.5rem; margin-top: 0.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(34,211,238,0.1);">
+                <div
+                    style="font-size: 0.65rem; font-weight: 700; color: var(--accent); opacity: 0.8; margin-bottom: 0.25rem;">
+                    PRO TIP</div>
+                <div style="font-size: 0.65rem; opacity: 0.6; line-height: 1.3;">If your server doesn't have an API_KEY
+                    set, just leave it blank and use DB User/Pass.</div>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button @click="showAddServer = false" class="btn btn-ghost" style="flex: 1;">CANCEL</button>
+                <button @click="saveServer" class="btn btn-primary" style="flex: 2;">AUTHORIZE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Server Manager -->
+    <div class="modal-overlay" x-show="openServerManager" x-cloak @click.self="openServerManager = false">
+        <div class="modal-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="font-weight: 800;">Node Fleet</h2>
+                <button @click="openServerManager = false" class="btn btn-ghost"
+                    style="padding: 0.5rem;">&times;</button>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <button @click="startQRScanner" class="btn btn-primary"
+                    style="flex: 1; background: #22d3ee; color: #000; font-size: 0.75rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                        <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                        <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                        <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                        <path d="M7 7h10v10H7z"></path>
+                    </svg>
+                    SCAN QR
+                </button>
+                <button
+                    @click="editingServerIdx = null; tempServer = { name: '', url: '', apiKey: '2026', host: '127.0.0.1', port: '3306', username: '', password: '', database: '' }; showAddServer = true; openServerManager = false"
+                    class="btn btn-primary" style="flex: 1; font-size: 0.75rem;">+ NEW NODE</button>
+            </div>
+
+            <div style="margin-bottom: 1rem; text-align: right;">
+                <button
+                    @click="if(confirm('Wipe all local data and nodes?')) { localStorage.clear(); location.reload(); }"
+                    class="btn btn-ghost" style="color: var(--danger); font-size: 0.6rem; padding: 0.25rem;">FACTORY
+                    RESET APP</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 50vh; overflow-y: auto;">
+                <template x-for="(s, idx) in servers">
+                    <div class="card" style="padding: 1rem; margin-bottom: 1rem; border-left: 4px solid var(--border);"
+                        :style="currentServer?.url === s.url ? 'border-left-color: var(--accent); background: rgba(34,211,238,0.03)' : ''">
+
+                        <div @click="selectServer(s); openServerManager = false" style="cursor: pointer;">
+                            <div style="font-weight: 800; font-size: 1.1rem; color: #fff;" x-text="s.name"></div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace; opacity: 0.7;"
+                                x-text="s.url"></div>
+                        </div>
+
+                        <div
+                            style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                            <button @click.stop="editServer(idx)" class="btn btn-ghost"
+                                style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; background: rgba(34,211,238,0.1); color: var(--accent);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" style="margin-right:0.25rem;">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                MODIFY
+                            </button>
+                            <button @click.stop="removeServer(idx)" class="btn btn-ghost"
+                                style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; background: rgba(239,68,68,0.1); color: #ff6b6b;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" style="margin-right:0.25rem;">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path
+                                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                    </path>
+                                </svg>
+                                REMOVE
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Record Inspector & Editor -->
+    <div class="modal-overlay" x-show="showInspector" x-cloak @click.self="showInspector = false">
+        <div class="modal-card" x-show="showInspector" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 style="font-weight: 800;" x-text="isEditing ? 'Modify Record' : 'Record Intel'"></h2>
+                <button @click="isEditing = !isEditing" class="btn btn-ghost"
+                    style="padding: 0.5rem; border-radius: 0.5rem;" x-text="isEditing ? 'VIEW' : 'EDIT'"></button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <template x-for="col in tableData.columns">
+                    <div>
+                        <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 800; margin-bottom: 0.5rem;"
+                            x-text="col.Field"></div>
+
+                        <template x-if="!isEditing">
+                            <div style="font-family: monospace; font-size: 0.9rem; word-break: break-all; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border);"
+                                x-text="activeRow[col.Field]"></div>
+                        </template>
+
+                        <template x-if="isEditing">
+                            <input type="text" class="input-control" x-model="editForm[col.Field]"
+                                :disabled="col.Key === 'PRI' || col.Extra === 'auto_increment'"
+                                :style="col.Key === 'PRI' ? 'opacity: 0.5; border-style: dashed;' : ''">
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <div style="margin-top: 2.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <button x-show="isEditing" @click="saveEdit" class="btn btn-primary">SAVE CHANGES</button>
+                <button @click="confirmDelete" class="btn btn-danger">DELETE RECORD PERMANENTLY</button>
+                <button @click="showInspector = false" class="btn btn-ghost">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Insert Modal -->
+    <div class="modal-overlay" x-show="showInsert" x-cloak @click.self="showInsert = false">
+        <div class="modal-card" x-show="showInsert" x-transition:enter="modal-enter" x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 2rem;">Push New Record</h2>
+            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <template x-for="col in tableData.columns">
+                    <div x-show="col.Extra !== 'auto_increment'">
+                        <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 800; margin-bottom: 0.4rem;"
+                            x-text="col.Field"></div>
+                        <input type="text" class="input-control" x-model="insertForm[col.Field]"
+                            :placeholder="col.Type">
+                    </div>
+                </template>
+            </div>
+            <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                <button @click="showInsert = false" class="btn btn-ghost" style="flex: 1;">ABORT</button>
+                <button @click="executeInsert" class="btn btn-primary" style="flex: 2;">COMMIT DATA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Table Actions (Maintenance) -->
+    <div class="modal-overlay" x-show="showTableActions" x-cloak @click.self="showTableActions = false">
+        <div class="modal-card" x-show="showTableActions" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 2rem;">Table Maintenance</h2>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <button @click="optimizeTable" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 1.25rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                    OPTIMIZE STORAGE
+                </button>
+                <button @click="renameTable" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 1.25rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    RENAME ENTITY
+                </button>
+                <button @click="dropTable" class="btn btn-danger"
+                    style="justify-content: flex-start; padding: 1.25rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    DROP TABLE PERMANENTLY
+                </button>
+                <button @click="showTableActions = false" class="btn btn-ghost" style="margin-top: 1rem;">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div class="modal-overlay" x-show="showQRScanner" x-cloak @click.self="stopQRScanner">
+        <div class="modal-card" style="max-width: 500px; padding: 0;">
+            <div
+                style="padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+                <h3 style="font-weight: 800;">Scan Connection QR</h3>
+                <button @click="stopQRScanner" class="btn btn-ghost" style="padding: 0.5rem;">&times;</button>
+            </div>
+            <div style="position: relative; background: #000; overflow: hidden; height: 350px;">
+                <video id="qrVideo" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                <canvas id="qrCanvas" style="display: none;"></canvas>
+                <div
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5);">
+                </div>
+                <div
+                    style="position: absolute; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">
+                    Align QR code within the frame</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global hidden inputs -->
+
+    <!-- 6. Snippets -->
+    <div class="modal-overlay" x-show="showSnippets" x-cloak @click.self="showSnippets = false">
+        <div class="modal-card" x-show="showSnippets" x-transition:enter="modal-enter" x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 1.5rem;">Query Snippets</h2>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <template x-for="(s, i) in snippets">
+                    <div class="server-item" @click="sqlQuery = s.query; showSnippets = false; homeTab = 'console'">
+                        <div style="font-weight: 700;" x-text="s.name"></div>
+                        <button @click.stop="removeSnippet(i)"
+                            style="color: var(--danger); background:none; border:none; padding: 0.5rem; opacity: 0.3;">&times;</button>
+                    </div>
+                </template>
+                <button @click="saveSnippet" class="btn btn-ghost" style="border-style: dashed; opacity: 0.6;">+ SAVE
+                    CURRENT AS SNIPPET</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        window.addEventListener('hardwareBackPress', (e) => {
+            const app = document.querySelector('[x-data="mobileApp"]').__x.$data;
+            if (app) {
+                if (app.showInsert || app.showInspector || app.showTableActions || app.showSnippets || app.showAddServer || app.openServerManager || app.showQRScanner) {
+                    e.preventDefault();
+                    app.showInsert = false;
+                    app.showInspector = false;
+                    app.showTableActions = false;
+                    app.showSnippets = false;
+                    app.showAddServer = false;
+                    app.openServerManager = false;
+                    app.stopQRScanner(); // Ensure scanner stops
+                } else if (app.selectedTable) {
+                    e.preventDefault();
+                    app.selectedTable = null;
+                } else if (app.showProcessList) {
+                    e.preventDefault();
+                    app.showProcessList = false;
+                } else if (app.currentServer) {
+                    e.preventDefault();
+                    app.currentServer = null;
+                }
+            }
+        });
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('mobileApp', () => ({
+                servers: JSON.parse(localStorage.getItem('sqluxe_mobile_servers') || '[]'),
+                snippets: JSON.parse(localStorage.getItem('sqluxe_mobile_snippets') || '[]'),
+                history: JSON.parse(localStorage.getItem('sqluxe_mobile_history') || '[]'),
+                currentServer: null,
+                showAddServer: false,
+                openServerManager: false,
+                showQRScanner: false,
+                qrScanStream: null,
+
+                showInspector: false,
+                showInsert: false,
+                showTableActions: false,
+                showSnippets: false,
+                showProcessList: false,
+
+                homeTab: 'tables',
+                loading: false,
+
+                tableSearch: '',
+                tables: [],
+                selectedTable: null,
+                tableData: { columns: [], rows: [], meta: {} },
+
+                searchQuery: '',
+                activeRow: {},
+                editForm: {},
+                insertForm: {},
+                isEditing: false,
+                page: 1,
+
+                sqlQuery: '',
+                processes: [],
+                tempServer: {
+                    name: '', url: '', domainUrl: '', protocol: 'https://', apiKey: '',
+                    host: '127.0.0.1', port: '3306', username: '', password: '', database: ''
+                },
+                editingServerIdx: null,
+
+                async init() {
+                    // Trigger fingerprint/biometric authentication on app launch
+                    if (window.Fingerprint) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                window.Fingerprint.isAvailable(() => {
+                                    window.Fingerprint.show({
+                                        clientId: "ServerLuxe",
+                                        clientSecret: "password",
+                                        disableBackup: true,
+                                        title: 'Authenticate',
+                                        subtitle: 'Unlock Application'
+                                    }, () => resolve(), (err) => reject(err));
+                                }, (error) => {
+                                    console.log('Biometric auth not available, skipping.', error);
+                                    resolve();
+                                });
+                            });
+                        } catch (e) {
+                            console.log('Biometric auth failed or cancelled:', e);
+                            window.haptic('error');
+                            window.uiAlert('Authentication cancelled. App will close.');
+                            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+                                window.Capacitor.Plugins.App.exitApp();
+                            }
+                            return;
+                        }
+                    }
+
+                    this.$watch('showProcessList', val => { if (val) this.fetchProcesses(); });
+                },
+
+                async startQRScanner() {
+                    // Check for secure context (required for camera)
+                    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.includes('capacitor')) {
+                        window.uiAlert('Camera access requires a secure connection (HTTPS). If you are using an IP address, please use HTTPS.');
+                        return;
+                    }
+
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        window.uiAlert('Your browser or device does not support camera access.');
+                        return;
+                    }
+
+                    try {
+                        // Fallback to pure HTML5 permission stream
+                        // Trigger permission prompt immediately to preserve user gesture
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            }
+                        });
+
+                        this.qrScanStream = stream;
+                        this.showQRScanner = true;
+                        this.openServerManager = false;
+
+                        this.$nextTick(() => {
+                            const video = document.getElementById('qrVideo');
+                            if (video) {
+                                video.srcObject = stream;
+                                video.setAttribute('playsinline', true);
+                                video.play();
+                                this.scanLoop();
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Camera Error:', err);
+                        let msg = 'Camera access failed: ' + err.message;
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            msg = 'CAMERA PERMISSION DENIED.\n\nPlease fix this:\n1. Open Android SETTINGS\n2. Go to APPS > SQLuxe\n3. Select PERMISSIONS\n4. Select CAMERA > ALLOW';
+                        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                            msg = 'No camera found on this device.';
+                        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                            msg = 'Camera is already in use or busy. Please close other apps using the camera.';
+                        }
+                        window.uiAlert(msg);
+                        this.showQRScanner = false;
+                    }
+                },
+
+
+                stopQRScanner() {
+                    this.showQRScanner = false;
+                    if (this.qrScanStream) {
+                        this.qrScanStream.getTracks().forEach(track => track.stop());
+                        this.qrScanStream = null;
+                    }
+                },
+
+                scanLoop() {
+                    if (!this.showQRScanner) return;
+                    const video = document.getElementById('qrVideo');
+                    const canvas = document.getElementById('qrCanvas');
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.height = video.videoHeight;
+                        canvas.width = video.videoWidth;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'attemptBoth',
+                        });
+                        if (code) {
+                            try {
+                                const data = JSON.parse(code.data);
+                                if (data.url && data.name) {
+                                    // Check for correct QR type (SQL app expects 'sql' type)
+                                    if (data.type && data.type !== 'sql') {
+                                        window.haptic('error');
+                                        this.stopQRScanner();
+                                        window.uiAlert('Invalid QR Type: This QR is for ' + (data.type === 'fm' ? 'File Manager' : data.type) + '. Please use the correct app section.');
+                                        return;
+                                    }
+
+                                    window.haptic('success');
+                                    this.stopQRScanner();
+                                    this.tempServer = {
+                                        name: data.name,
+                                        url: data.url,
+                                        apiKey: data.apiKey || '',
+                                        protocol: data.url.startsWith('https') ? 'https://' : 'http://',
+                                        domainUrl: data.url.replace('https://', '').replace('http://', '')
+                                    };
+                                    this.showAddServer = true;
+                                    window.uiAlert('QR Code Scanned! Server details filled.');
+                                    return;
+                                }
+                            } catch (e) {
+                                // Not a valid JSON or doesn't have required fields, keep scanning
+                            }
+                        }
+                    }
+                    requestAnimationFrame(() => this.scanLoop());
+                },
+
+                exportNodes() {
+                    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.servers));
+                    let dlAnchorElem = document.createElement('a');
+                    dlAnchorElem.setAttribute("href", dataStr);
+                    dlAnchorElem.setAttribute("download", "luxe_nodes.json");
+                    dlAnchorElem.click();
+                },
+
+                importNodes(e) {
+                    let file = e.target.files[0];
+                    if (!file) return;
+                    let reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            let imported = JSON.parse(e.target.result);
+                            if (Array.isArray(imported)) {
+                                this.servers = imported;
+                                localStorage.setItem('sqluxe_mobile_servers', JSON.stringify(this.servers));
+                                window.uiAlert('Nodes successfully imported!');
+                            }
+                        } catch (err) {
+                            window.uiAlert('Invalid backup structure.');
+                        }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                },
+
+                get filteredTables() {
+                    return this.tables.filter(t => {
+                        const name = typeof t === 'string' ? t : t.Name;
+                        return name.toLowerCase().includes(this.tableSearch.toLowerCase());
+                    });
+                },
+
+                saveServer() {
+                    // Recompile URL
+                    if (!this.tempServer.domainUrl) return window.uiAlert("Please provide the domain/path");
+                    this.tempServer.url = this.tempServer.protocol + this.tempServer.domainUrl;
+
+                    if (!this.tempServer.name || !this.tempServer.url) return window.uiAlert('Fill required fields');
+
+                    if (this.editingServerIdx !== null) {
+                        this.servers[this.editingServerIdx] = { ...this.tempServer };
+                        // If we edited the one currently active, re-sync it
+                        if (this.currentServer && this.currentServer.url === this.servers[this.editingServerIdx].url) {
+                            this.currentServer = { ...this.tempServer };
+                            localStorage.setItem('sqluxe_current_server', JSON.stringify(this.currentServer));
+                        }
+                    } else {
+                        this.servers.push({ ...this.tempServer });
+                    }
+
+                    localStorage.setItem('sqluxe_mobile_servers', JSON.stringify(this.servers));
+                    window.haptic('success');
+                    if (this.editingServerIdx === null) {
+                        this.selectServer(this.tempServer);
+                    }
+                    this.showAddServer = false;
+                    this.editingServerIdx = null;
+                    this.tempServer = {
+                        name: '', url: '', apiKey: '',
+                        host: '127.0.0.1', port: '3306', username: '', password: '', database: ''
+                    };
+                },
+
+                editServer(idx) {
+                    this.editingServerIdx = idx;
+                    const s = this.servers[idx];
+
+                    let parsedUrl = s.url || '';
+                    let protocol = 'https://';
+                    let domainUrl = parsedUrl;
+                    if (parsedUrl.startsWith('http://')) { protocol = 'http://'; domainUrl = parsedUrl.replace('http://', ''); }
+                    if (parsedUrl.startsWith('https://')) { protocol = 'https://'; domainUrl = parsedUrl.replace('https://', ''); }
+
+                    this.tempServer = {
+                        name: s.name || '',
+                        url: s.url || '',
+                        protocol: protocol,
+                        domainUrl: domainUrl,
+                        apiKey: s.apiKey || '',
+                        host: s.host || '127.0.0.1',
+                        port: s.port || '3306',
+                        username: s.username || '',
+                        password: s.password || '',
+                        database: s.database || ''
+                    };
+                    this.openServerManager = false;
+                    this.showAddServer = true;
+                },
+
+                selectServer(s) {
+                    window.haptic('impactLight');
+                    this.currentServer = s;
+                    this.selectedTable = null;
+                    this.viewConsole = false;
+                    localStorage.setItem('sqluxe_current_server', JSON.stringify(s));
+                    this.fetchTables();
+                },
+
+                async removeServer(idx) {
+                    const s = this.servers[idx];
+                    if (!await window.uiConfirm('Are you sure you want to remove the node "' + s.name + '"?')) return;
+
+                    this.servers.splice(idx, 1);
+                    localStorage.setItem('sqluxe_mobile_servers', JSON.stringify(this.servers));
+                    window.haptic('warning');
+                    if (this.servers.length === 0) {
+                        this.currentServer = null;
+                        localStorage.removeItem('sqluxe_current_server');
+                    }
+                },
+
+                async apiRequest(action, params = {}, isPost = false) {
+                    if (!this.currentServer) return;
+                    console.log(`[SQLuxe API] ${isPost ? 'POST' : 'GET'} Request: ${action}`, params);
+
+                    const url = new URL(this.currentServer.url);
+                    const dbConfig = {
+                        host: this.currentServer.host || '127.0.0.1',
+                        port: this.currentServer.port || '3306',
+                        username: this.currentServer.username || '',
+                        password: this.currentServer.password || '',
+                        database: this.currentServer.database || ''
+                    };
+
+                    const headers = {
+                        'X-API-KEY': this.currentServer.apiKey,
+                        'X-DB-CONFIG': JSON.stringify(dbConfig)
+                    };
+
+                    let body = null;
+                    if (isPost) {
+                        body = new FormData();
+                        body.append('action', action);
+                        Object.entries(params).forEach(([k, v]) => body.append(k, typeof v === 'object' ? JSON.stringify(v) : v));
+                    } else {
+                        url.searchParams.set('ajax', action);
+                        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+                    }
+
+                    try {
+                        const res = await fetch(url, { method: isPost ? 'POST' : 'GET', headers, body });
+                        console.log(`[SQLuxe API] Status: ${res.status} ${res.statusText}`);
+
+                        const data = await res.json();
+                        if (data.error) {
+                            console.error(`[SQLuxe API] Error Response:`, data.error);
+                            throw new Error(data.error);
+                        }
+                        return data;
+                    } catch (e) {
+                        console.error(`[SQLuxe API] Critical Failure:`, e.message);
+                        alert('API Error: ' + e.message);
+                        return null;
+                    }
+                },
+
+                async fetchTables() {
+                    this.loading = true;
+                    this.tables = []; // Clear current list
+                    const data = await this.apiRequest('db_stats');
+                    if (data && data.stats) {
+                        // If server-side we are inside a DB, update our UI state to match
+                        if (data.db_name) {
+                            this.currentServer.database = data.db_name;
+                            localStorage.setItem('sqluxe_current_server', JSON.stringify(this.currentServer));
+                        }
+
+                        // Map the stats. If it's a list of tables from SHOW TABLE STATUS, 
+                        // they might be objects with 'Name' property, or if it's our new list, 
+                        // they are objects with 'Name' and 'is_database'.
+                        this.tables = data.stats.map(s => {
+                            if (typeof s === 'string') return s;
+                            return s; // Keep as object to handle is_database flag
+                        });
+                    }
+                    this.loading = false;
+                },
+
+                async selectTable(item) {
+                    // Handle Database selection
+                    if (typeof item === 'object' && item.is_database) {
+                        this.currentServer.database = item.Name;
+                        localStorage.setItem('sqluxe_current_server', JSON.stringify(this.currentServer));
+
+                        // Sync back to server list
+                        const idx = this.servers.findIndex(s => s.url === this.currentServer.url && s.name === this.currentServer.name);
+                        if (idx !== -1) {
+                            this.servers[idx].database = item.Name;
+                            localStorage.setItem('sqluxe_mobile_servers', JSON.stringify(this.servers));
+                        }
+
+                        this.fetchTables(); // Reload to get tables of THIS database
+                        return;
+                    }
+
+                    // Handle Table selection
+                    this.selectedTable = typeof item === 'string' ? item : item.Name;
+                    this.page = 1;
+                    this.searchQuery = '';
+                    this.fetchTableData();
+                },
+
+                async fetchTableData() {
+                    this.loading = true;
+                    const data = await this.apiRequest('table_data', {
+                        table: this.selectedTable,
+                        page: this.page,
+                        search: this.searchQuery,
+                        limit: 500 // Increased limit to show "all" rows as requested
+                    });
+                    if (data) this.tableData = data;
+                    this.loading = false;
+                },
+
+                inspectRow(row) {
+                    this.activeRow = row;
+                    this.editForm = JSON.parse(JSON.stringify(row));
+                    this.isEditing = false;
+                    this.showInspector = true;
+                },
+
+                async saveEdit() {
+                    const pkField = this.tableData.columns.find(c => c.Key === 'PRI')?.Field || this.tableData.columns[0].Field;
+                    const res = await this.apiRequest('update_row', {
+                        table: this.selectedTable,
+                        data: this.editForm,
+                        pk_column: pkField,
+                        pk_value: this.activeRow[pkField]
+                    }, true);
+                    if (res?.success) {
+                        this.showInspector = false;
+                        this.fetchTableData();
+                    }
+                },
+
+                async confirmDelete() {
+                    if (!await window.uiConfirm('Destroy this record permanently?')) return;
+                    const pkField = this.tableData.columns.find(c => c.Key === 'PRI')?.Field || this.tableData.columns[0].Field;
+                    const res = await this.apiRequest('delete_row', {
+                        table: this.selectedTable,
+                        pk_column: pkField,
+                        pk_value: this.activeRow[pkField]
+                    }, true);
+                    if (res?.success) {
+                        this.showInspector = false;
+                        this.fetchTableData();
+                    }
+                },
+
+                openInsertModal() {
+                    this.insertForm = {};
+                    this.showInsert = true;
+                },
+
+                async executeInsert() {
+                    const res = await this.apiRequest('insert_row', {
+                        table: this.selectedTable,
+                        data: this.insertForm
+                    }, true);
+                    if (res?.success) {
+                        this.showInsert = false;
+                        this.fetchTableData();
+                    }
+                },
+
+                async executeSQL() {
+                    if (!this.sqlQuery) return;
+                    this.loading = true;
+                    const res = await this.apiRequest('execute_sql', { query: this.sqlQuery }, true);
+                    if (res?.success) {
+                        this.history.unshift(this.sqlQuery);
+                        if (this.history.length > 20) this.history.pop();
+                        localStorage.setItem('sqluxe_mobile_history', JSON.stringify(this.history));
+                        window.uiAlert('Executed OK. Affected: ' + (res.data?.length || 0));
+                    }
+                    this.loading = false;
+                },
+
+                async saveSnippet() {
+                    if (!this.sqlQuery) return;
+                    const name = await window.uiPrompt('Snippet Name:');
+                    if (!name) return;
+                    this.snippets.push({ name, query: this.sqlQuery });
+                    localStorage.setItem('sqluxe_mobile_snippets', JSON.stringify(this.snippets));
+                    this.showSnippets = false;
+                },
+                removeSnippet(i) {
+                    this.snippets.splice(i, 1);
+                    localStorage.setItem('sqluxe_mobile_snippets', JSON.stringify(this.snippets));
+                },
+
+
+                async fetchProcesses() {
+                    this.loading = true;
+                    const res = await this.apiRequest('process_list');
+                    if (res?.success) this.processes = res.processes;
+                    this.loading = false;
+                },
+
+                async optimizeTable() {
+                    if (!await window.uiConfirm('Optimize ' + this.selectedTable + '?')) return;
+                    const res = await this.apiRequest('optimize_table', { table: this.selectedTable }, true);
+                    if (res?.success) window.uiAlert('Optimized!');
+                    this.showTableActions = false;
+                },
+
+                async renameTable() {
+                    const next = await window.uiPrompt('New name for ' + this.selectedTable + ':', this.selectedTable);
+                    if (!next || next === this.selectedTable) return;
+                    const res = await this.apiRequest('rename_table', { old_name: this.selectedTable, new_name: next }, true);
+                    if (res?.success) {
+                        this.selectedTable = next;
+                        this.fetchTables();
+                    }
+                    this.showTableActions = false;
+                },
+
+                async dropTable() {
+                    if (!await window.uiConfirm('DROP TABLE ' + this.selectedTable + '? PERMANENT DATA LOSS!')) return;
+                    if (!await window.uiConfirm('SECOND CONFIRMATION: Are you sure?')) return;
+                    const res = await this.apiRequest('drop_table', { table: this.selectedTable }, true);
+                    if (res?.success) {
+                        this.selectedTable = null;
+                        this.fetchTables();
+                    }
+                    this.showTableActions = false;
+                },
+
+                handleScroll(e) { /* Elastic UI hooks if needed */ }
+            }));
+
+            // Strictly enforce StatusBar color on launch for Capacitor
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
+                try {
+                    window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: '#1E293B' });
+                    window.Capacitor.Plugins.StatusBar.setStyle({ style: 'DARK' });
+                    window.Capacitor.Plugins.StatusBar.setOverlaysWebView({ overlay: false });
+                } catch (e) { console.error('StatusBar init failed:', e); }
+            }
+        });
+    </script>
+</body>
+
+</html>

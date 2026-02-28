@@ -1,0 +1,1593 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1E293B">
+    <title>ServerLuxe</title>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-elevated: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #a855f7;
+            /* Purple accent for FTP */
+            --danger: #ef4444;
+            --success: #10b981;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .safe-area-inset {
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .app-header {
+            padding: 1.25rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .main-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+            padding-bottom: 5rem;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            width: 100%;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .input-control {
+            width: 100%;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            color: #fff;
+            font-family: inherit;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .input-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-group-item {
+            border: none;
+            border-radius: 0;
+            border-right: 1px solid var(--border);
+            padding: 0.5rem 0.6rem;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.65rem;
+            font-weight: 600;
+            line-height: 1;
+            transition: all 0.2s;
+            font-family: inherit;
+            flex: 1;
+        }
+
+        .btn-group-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--accent);
+        }
+
+        .btn-primary-item {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-primary-item:hover {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-group>*:last-child {
+            border-right: none;
+        }
+
+        @media (max-width: 768px) {
+            .btn-group-item .btn-text {
+                display: none;
+            }
+        }
+
+        .server-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .modal-card {
+            background: var(--bg-surface);
+            width: 100%;
+            border-radius: 1.5rem 1.5rem 0 0;
+            padding: 2rem;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-enter {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .modal-leave {
+            animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(0);
+            }
+
+            to {
+                transform: translateY(100%);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .badge {
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.4rem;
+            text-transform: uppercase;
+        }
+
+        .badge-accent {
+            background: rgba(168, 85, 247, 0.1);
+            color: var(--accent);
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .path-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 700;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .path-breadcrumb span {
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body x-data="ftpApp">
+
+    <header class="app-header safe-area-inset">
+        <div class="flex items-center gap-2">
+            <h1 @click="window.location.href='https://bycomsolutions.com'"
+                style="font-size: 1.25rem; font-weight: 800; color: var(--accent); cursor: pointer;">FMLuxe</h1>
+
+            <template x-if="currentServer">
+                <span class="badge badge-accent" x-text="currentServer.name"></span>
+            </template>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button onclick="switchApp('index.html')" class="btn btn-ghost" style="padding: 0.5rem;"
+                title="Switch to SQL">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                </svg>
+            </button>
+            <button @click="openServerManager = true" class="btn btn-ghost" style="padding: 0.5rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="pointer-events: none;">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+            </button>
+
+        </div>
+    </header>
+
+    <main class="main-scroll">
+        <!-- Dashboard / Connect Screen -->
+        <template x-if="!currentServer">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="font-weight: 800; font-size: 1.25rem;">Saved Nodes</h2>
+                    <div style="display:flex; gap: 0.5rem;">
+                        <button @click="startQRScanner" class="btn btn-primary"
+                            style="padding: 0.4rem 0.6rem; font-size: 0.65rem; background: #22d3ee; color: #000;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                                <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                                <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                                <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                                <path d="M7 7h10v10H7z"></path>
+                            </svg>
+                            SCAN
+                        </button>
+                        <button @click="exportNodes" class="btn btn-ghost"
+                            style="padding: 0.4rem 0.6rem; font-size: 0.65rem;">EXPORT</button>
+                        <button @click="document.getElementById('importNodesInput').click()" class="btn btn-ghost"
+                            style="padding: 0.4rem 0.6rem; font-size: 0.65rem;">IMPORT</button>
+                    </div>
+                </div>
+
+                <template x-if="servers.length === 0">
+                    <div style="text-align: center; padding-top: 4rem;">
+                        <div
+                            style="width: 80px; height: 80px; background: rgba(168, 85, 247, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; color: var(--accent);">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 16V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10"></path>
+                                <path d="M4 18v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+                                <path d="M12 14v4"></path>
+                                <path d="M16 10H8"></path>
+                            </svg>
+                        </div>
+                        <h2 style="font-weight: 800; margin-bottom: 0.5rem;">Ready to Connect</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 2rem;">Add your File Manager Endpoint to
+                            get started.
+                        </p>
+                        <button @click="startQRScanner" class="btn btn-primary"
+                            style="width: 100%; max-width: 250px; margin: 0 auto; background: #22d3ee; color: #000;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                                <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                                <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                                <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                                <path d="M7 7h10v10H7z"></path>
+                            </svg>
+                            SCAN CONNECTION QR
+                        </button>
+                    </div>
+                </template>
+
+
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <template x-for="(s, idx) in servers">
+                        <div class="card"
+                            style="padding: 1rem; margin-bottom: 0; border-left: 4px solid var(--accent); cursor:pointer;"
+                            @click="selectServer(s)">
+                            <div style="font-weight: 800; font-size: 1.1rem; color: #fff;" x-text="s.name"></div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace; opacity: 0.7;"
+                                x-text="s.url"></div>
+                            <div
+                                style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                                <button @click.stop="editServer(idx)" class="btn btn-ghost"
+                                    style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; color: var(--accent); border-color: rgba(168,85,247,0.3);">
+                                    EDIT
+                                </button>
+                                <button @click.stop="removeServer(idx)" class="btn btn-ghost"
+                                    style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; color: #ff6b6b; border-color: rgba(239,68,68,0.3);">
+                                    REMOVE
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div style="margin-top:2rem;">
+                    <button
+                        @click="tempServer = { name: '', url: '', apiKey: '' }; editingServerIdx = null; showAddServer = true"
+                        class="btn btn-primary" style="color:#fff;">+ ADD NODE</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- Main Manager view -->
+        <template x-if="currentServer">
+            <div x-cloak>
+                <div class="card" style="padding: 1rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <div class="path-breadcrumb"
+                            style="width: 100%; white-space: nowrap; overflow-x: auto; padding-bottom:0.5rem;">
+                            <span @click="navigateTo('/')">/</span>
+                            <template x-for="(segment, index) in pathSegments">
+                                <span style="display:inline-flex; align-items:center; gap:0.25rem;">
+                                    <span style="opacity:0.4;">/</span>
+                                    <span @click="navigateToSegment(index)" x-text="segment"></span>
+                                </span>
+                            </template>
+                        </div>
+
+                        <!-- Folder Bookmarks -->
+                        <div x-show="bookmarks.length > 0"
+                            style="display: flex; gap: 0.5rem; overflow-x: auto; width: 100%; padding-bottom: 0.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+                            <template x-for="bm in bookmarks" :key="bm">
+                                <div class="stat-badge" @click="navigateTo(bm)"
+                                    style="flex: none; display: flex; align-items: center; gap: 0.25rem; font-size: 0.6rem; cursor: pointer; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); padding: 0.25rem 0.5rem; border-radius: 0.5rem; color: var(--accent);">
+                                    <span x-text="bm === '/' ? 'Root' : bm.split('/').pop()"></span>
+                                    <span @click.stop="removeBookmark(bm)"
+                                        style="color: var(--danger); font-weight: bold; padding-left: 4px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.1);">&times;</span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="btn-group" style="box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.2); width: 100%;">
+                            <button @click="showMkdir = true" class="btn-group-item btn-primary-item"
+                                style="color: #000;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span class="btn-text">Folder</span>
+                            </button>
+                            <button @click="showNewFile = true" class="btn-group-item" title="New File"
+                                style="background: rgba(168, 85, 247, 0.2); color: var(--accent);">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span class="btn-text">File</span>
+                            </button>
+                            <button @click="$refs.fileInput.click()" class="btn-group-item" title="Upload">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <span class="btn-text">Upload</span>
+                            </button>
+                            <input type="file" x-ref="fileInput" @change="uploadFile" style="display:none;">
+                            <button @click="showRemoteUpload = true" class="btn-group-item" title="Remote Upload">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"></path>
+                                    <polyline points="12 16 16 12 12 8"></polyline>
+                                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                                </svg>
+                                <span class="btn-text">Remote</span>
+                            </button>
+                            <button @click="fetchFiles(currentPath)" class="btn-group-item" title="Refresh"
+                                style="border-right: none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" :class="loading ? 'animate-spin' : ''">
+                                    <path
+                                        d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
+                                <span class="btn-text">Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div x-show="loading" style="text-align: center; padding: 2rem;">
+                        <div class="spinner animate-spin"
+                            style="width: 24px; height: 24px; border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto;">
+                        </div>
+                    </div>
+
+                    <div x-show="!loading">
+                        <div class="server-item" @click="navigateUp()" style="cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                    stroke="var(--text-secondary)" stroke-width="2">
+                                    <path
+                                        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                    </path>
+                                </svg>
+                                <span style="font-weight: 700;">.. (Up)</span>
+                            </div>
+                        </div>
+                        <template x-for="item in files" :key="item.name">
+                            <div class="server-item" @click="() => {
+                                    if (selectedItems.length > 0) { toggleSelection(item); } 
+                                    else { item.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + item.name : currentPath + '/' + item.name) : inspectFile(item); }
+                                }" @contextmenu.prevent="toggleSelection(item)"
+                                :style="selectedItems.find(i => i.name === item.name) ? 'cursor: pointer; background: rgba(168,85,247,0.15); border-color: var(--accent);' : 'cursor: pointer;'">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
+                                    <template x-if="item.type === 'directory'">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="var(--accent)" stroke-width="2" style="flex-shrink: 0;">
+                                            <path
+                                                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                            </path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="item.type === 'file'">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink: 0;">
+                                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                            <polyline points="13 2 13 9 20 9"></polyline>
+                                        </svg>
+                                    </template>
+                                    <div
+                                        style="display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                                        <span style="font-weight: 700; overflow: hidden; text-overflow: ellipsis;"
+                                            x-text="item.name"></span>
+                                        <div style="font-size: 0.55rem; color: var(--text-secondary); opacity: 0.7;"
+                                            x-text="formatSize(item.size) + ' â€¢ ' + item.permissions + ' â€¢ ' + item.date">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button @click.stop="openItemMenu(item)" class="btn btn-ghost"
+                                    style="padding: 0.4rem; border: none; margin-left: 0.5rem;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" style="pointer-events: none;">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="12" cy="5" r="1"></circle>
+                                        <circle cx="12" cy="19" r="1"></circle>
+                                    </svg>
+
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="files.length === 0">
+                            <div style="text-align: center; padding: 2rem; opacity: 0.5; font-size: 0.8rem;">Folder is
+                                empty.</div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <div style="text-align: center; padding: 2rem; opacity: 0.3;">
+            <img src="https://bycomsolutions.com/_astro/logo.Bz8u1fa6_Z2e3zIX.webp"
+                style="width: 120px; filter: grayscale(1) brightness(2);">
+        </div>
+
+        <!-- Bulk Selection Bar -->
+        <div x-show="selectedItems.length > 0" x-transition x-cloak
+            style="position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-surface); padding: 1rem; border-top: 1px solid var(--accent); display: flex; align-items: center; justify-content: space-between; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.5);">
+            <div style="font-weight: 800; color: var(--text-primary);">
+                <span x-text="selectedItems.length"></span> Selected
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button @click="clearSelection()" class="btn btn-ghost" style="padding: 0.5rem;">Cancel</button>
+                <button @click="deleteSelected()" class="btn btn-danger"
+                    style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modals -->
+    <!-- Add Server -->
+    <div class="modal-overlay" x-show="showAddServer" x-cloak @click.self="showAddServer = false">
+        <div class="modal-card" x-show="showAddServer" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 1.5rem;"
+                x-text="editingServerIdx !== null ? 'Modify Node' : 'Add Manager Node'"></h2>
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">NODE LABEL</label>
+            <input type="text" class="input-control" placeholder="Production Files" x-model="tempServer.name">
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">API ENDPOINT
+                (fm.php)</label>
+            <div style="display: flex; gap: 0; margin-bottom: 1rem;">
+                <select class="input-control" x-model="tempServer.protocol"
+                    style="width: 35%; border-radius: 0.75rem 0 0 0.75rem; border-right: none; margin-bottom: 0;">
+                    <option value="https://">https://</option>
+                    <option value="http://">http://</option>
+                </select>
+                <input type="text" class="input-control" placeholder="site.com/fm.php" x-model="tempServer.domainUrl"
+                    style="width: 65%; border-radius: 0 0.75rem 0.75rem 0; margin-bottom: 0;">
+            </div>
+
+            <label style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary);">API KEY</label>
+            <input type="password" class="input-control" placeholder="Optional custom key" x-model="tempServer.apiKey">
+
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button @click="showAddServer = false" class="btn btn-ghost" style="flex: 1;">CANCEL</button>
+                <button @click="saveServer" class="btn btn-primary" style="flex: 2;">SAVE & CONNECT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remote Upload Modal -->
+    <div class="modal-overlay" x-show="showRemoteUpload" x-cloak @click.self="showRemoteUpload = false">
+        <div class="modal-card" x-show="showRemoteUpload">
+            <h2 style="font-weight: 800; margin-bottom: 1.5rem;">Remote Upload</h2>
+            <div class="input-group">
+                <label
+                    style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 0.5rem; display: block;">URL
+                    TO DOWNLOAD</label>
+                <input type="url" x-model="remoteUrl" placeholder="https://example.com/file.zip"
+                    style="width: 100%; padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border); background: var(--bg-deep); color: #fff;">
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button @click="showRemoteUpload = false" class="btn btn-ghost" style="flex: 1;">CANCEL</button>
+                <button @click="remoteUpload()" class="btn btn-primary" style="flex: 2;">DOWNLOAD</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Multi Servers Manager -->
+    <div class="modal-overlay" x-show="openServerManager" x-cloak @click.self="openServerManager = false">
+        <div class="modal-card" x-show="openServerManager" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-weight: 800;">Manager Nodes</h2>
+                    <button @click="openServerManager = false" class="btn btn-ghost" style="padding: 0.5rem;"><svg
+                            width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg></button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button @click="startQRScanner" class="btn btn-primary"
+                        style="flex: 1; background: #22d3ee; color: #000;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                            <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                            <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                            <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                            <path d="M7 7h10v10H7z"></path>
+                        </svg>
+                        SCAN QR
+                    </button>
+                    <button
+                        @click="tempServer = { name: '', url: '', apiKey: '' }; showAddServer = true; openServerManager = false"
+                        class="btn btn-primary" style="flex: 2; font-size: 0.75rem; color:#fff;">+ NEW NODE</button>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button @click="exportNodes" class="btn btn-ghost"
+                        style="flex: 1; font-size: 0.7rem; padding: 0.5rem;">EXPORT</button>
+                    <button @click="document.getElementById('importNodesInput').click()" class="btn btn-ghost"
+                        style="flex: 1; font-size: 0.7rem; padding: 0.5rem;">IMPORT</button>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 50vh; overflow-y: auto;">
+                <template x-for="(s, idx) in servers">
+                    <div class="card" style="padding: 1rem; margin-bottom: 1rem; border-left: 4px solid var(--border);"
+                        :style="currentServer?.url === s.url ? 'border-left-color: var(--accent); background: rgba(168,85,247,0.03)' : ''">
+                        <div @click="selectServer(s); openServerManager = false" style="cursor: pointer;">
+                            <div style="font-weight: 800; font-size: 1.1rem; color: #fff;" x-text="s.name"></div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace; opacity: 0.7;"
+                                x-text="s.url"></div>
+                        </div>
+                        <div
+                            style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                            <button @click.stop="removeServer(idx)" class="btn btn-ghost"
+                                style="flex: 1; font-size: 0.75rem; padding: 0.5rem; justify-content: center; color: #ff6b6b; border-color: rgba(239,68,68,0.3);">
+                                REMOVE
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Context Menu -->
+    <div class="modal-overlay" x-show="activeItem" x-cloak @click.self="activeItem = null">
+        <div class="modal-card" x-show="activeItem" x-transition:enter="modal-enter" x-transition:leave="modal-leave"
+            style="padding-bottom: env(safe-area-inset-bottom);">
+            <div style="display:flex; justify-content: space-between; align-items:flex-start; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="font-weight: 800; word-break: break-all;" x-text="activeItem?.name"></h3>
+                    <div style="font-size:0.7rem; color:var(--text-secondary); margin-top:0.2rem;"
+                        x-text="activeItem?.type === 'file' ? formatSize(activeItem?.size) : 'Directory'"></div>
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <template x-if="activeItem?.type === 'file'">
+                    <button @click="downloadFile(activeItem)" class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Download File
+                    </button>
+                </template>
+                <template x-if="activeItem?.type === 'directory'">
+                    <button
+                        @click="currentPath = currentPath === '/' ? '/' + activeItem.name : currentPath + '/' + activeItem.name; showNewFile = true; activeItem = null;"
+                        class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        New File Here
+                    </button>
+                </template>
+                <template x-if="activeItem?.type === 'directory'">
+                    <button
+                        @click="currentPath = currentPath === '/' ? '/' + activeItem.name : currentPath + '/' + activeItem.name; showMkdir = true; activeItem = null;"
+                        class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03); color: var(--success);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                            </path>
+                        </svg>
+                        New Folder Here
+                    </button>
+                </template>
+                <template x-if="activeItem?.type === 'directory'">
+                    <button
+                        @click="currentPath = currentPath === '/' ? '/' + activeItem.name : currentPath + '/' + activeItem.name; $refs.fileInput.click(); activeItem = null;"
+                        class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Upload File Here
+                    </button>
+                </template>
+                <template x-if="activeItem?.type === 'directory'">
+                    <button
+                        @click="currentPath = currentPath === '/' ? '/' + activeItem.name : currentPath + '/' + activeItem.name; showRemoteUpload = true; activeItem = null;"
+                        class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03); color: var(--accent);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"></path>
+                            <polyline points="12 16 16 12 12 8"></polyline>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        Remote Upload Here
+                    </button>
+                </template>
+                <template x-if="activeItem?.type === 'directory'">
+                    <button
+                        @click="currentPath = currentPath === '/' ? '/' + activeItem.name : currentPath + '/' + activeItem.name; saveCurrentAsBookmark(); activeItem = null;"
+                        class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03); color: var(--accent);">
+                        ★ Bookmark Folder
+                    </button>
+                </template>
+
+                <button @click="promptRename(activeItem)" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <polygon points="16 3 21 8 8 21 3 21 3 16 16 3"></polygon>
+                    </svg>
+                    Rename
+                </button>
+
+                <button @click="promptChmod(activeItem)" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    Permissions (CHMOD)
+                </button>
+                <button @click="promptMove(activeItem, 'move')" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <polyline points="5 9 2 12 5 15"></polyline>
+                        <polyline points="9 5 12 2 15 5"></polyline>
+                        <polyline points="19 9 22 12 19 15"></polyline>
+                        <polyline points="9 19 12 22 15 19"></polyline>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <line x1="12" y1="2" x2="12" y2="22"></line>
+                    </svg>
+                    Move
+                </button>
+                <button @click="promptMove(activeItem, 'copy')" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy
+                </button>
+                <button @click="promptZip(activeItem)" class="btn btn-ghost"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </svg>
+                    Compress to ZIP
+                </button>
+                <template
+                    x-if="activeItem && activeItem.type === 'file' && activeItem.name.toLowerCase().endsWith('.zip')">
+                    <button @click="unzipItem(activeItem)" class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                            <rect x="1" y="3" width="22" height="5"></rect>
+                            <line x1="10" y1="12" x2="14" y2="12"></line>
+                        </svg>
+                        Extract ZIP Here
+                    </button>
+                </template>
+                <button @click="deleteItem(activeItem)" class="btn btn-danger"
+                    style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(239, 68, 68, 0.1); margin-top: 1rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="margin-right: 0.75rem;">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    Delete Permanently
+                </button>
+            </div>
+
+            <button @click="activeItem = null" class="btn btn-ghost"
+                style="margin-top: 1rem; width:100%; border:none;">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Mkdir / Touch -->
+    <div class="modal-overlay" x-show="showMkdir || showNewFile" x-cloak
+        @click.self="showMkdir = false; showNewFile = false">
+        <div class="modal-card" x-show="showMkdir || showNewFile" x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave">
+            <h2 style="font-weight: 800; margin-bottom: 1.5rem;" x-text="showMkdir ? 'New Folder' : 'New File'">
+            </h2>
+            <input type="text" class="input-control" placeholder="Folder name" x-model="newFolderName">
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button @click="showMkdir = false; showNewFile = false" class="btn btn-ghost"
+                    style="flex: 1;">CANCEL</button>
+                <button @click="showMkdir ? createFolder() : createFile()" class="btn btn-primary"
+                    style="flex: 2; color:#fff;">CREATE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Editor -->
+    <div class="modal-overlay" x-show="showEditor" x-cloak>
+        <div
+            style="background: var(--bg-surface); width: 100%; height: 100vh; padding: 1rem; padding-top: env(safe-area-inset-top); display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-weight: 800; font-size:1rem; overflow: hidden; text-overflow:ellipsis; white-space:nowrap;"
+                    x-text="editingFile?.name"></h3>
+                <button @click="showEditor = false" class="btn btn-ghost"
+                    style="padding:0.4rem 0.8rem; font-size:0.7rem;">CLOSE</button>
+            </div>
+            <textarea x-model="fileContent" class="input-control"
+                style="flex:1; width:100%; height:100%; font-family: monospace; font-size: 0.8rem; padding: 1rem; resize: none; white-space: pre; border-color: var(--border); border-radius: 0.5rem; outline:none; background: #0f172a; color:#fff;"></textarea>
+            <button @click="saveFileContent" class="btn btn-primary" :disabled="loading"
+                style="margin-top:0.5rem; color:#fff;">
+                <span x-show="!loading">SAVE CHANGES</span>
+                <span x-show="loading">SAVING...</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div class="modal-overlay" x-show="showQRScanner" x-cloak @click.self="stopQRScanner">
+        <div class="modal-card" style="max-width: 500px; padding: 0;">
+            <div
+                style="padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+                <h3 style="font-weight: 800;">Scan Connection QR</h3>
+                <button @click="stopQRScanner" class="btn btn-ghost" style="padding: 0.5rem;">&times;</button>
+            </div>
+            <div style="position: relative; background: #000; overflow: hidden; height: 350px;">
+                <video id="qrVideo" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                <canvas id="qrCanvas" style="display: none;"></canvas>
+                <div
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5);">
+                </div>
+                <div
+                    style="position: absolute; bottom: 1.5rem; left: 0; width: 100%; text-align: center; color: #fff; font-size: 0.8rem; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">
+                    Align QR code within the frame</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global hidden inputs -->
+
+    <input type="file" id="importNodesInput" @change="importNodes($event)" style="display:none;" accept=".json">
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+
+        window.addEventListener('hardwareBackPress', (e) => {
+            const app = document.querySelector('[x-data="ftpApp"]').__x.$data;
+            if (app) {
+                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner) {
+                    e.preventDefault();
+                    app.showAddServer = false;
+                    app.openServerManager = false;
+                    app.showMkdir = false;
+                    app.showNewFile = false;
+                    app.activeItem = null;
+                    app.showEditor = false;
+                    app.stopQRScanner(); // Ensure scanner stops
+                } else if (app.currentPath && app.currentPath !== '/') {
+                    e.preventDefault();
+                    app.navigateUp();
+                } else if (app.currentServer) {
+                    e.preventDefault();
+                    app.currentServer = null;
+                }
+            }
+        });
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('ftpApp', () => ({
+                servers: JSON.parse(localStorage.getItem('ftp_servers') || '[]'),
+                currentServer: null,
+                showAddServer: false,
+                showMkdir: false,
+                showNewFile: false,
+                newFolderName: '',
+                activeItem: null,
+                tempServer: { name: '', url: '', domainUrl: '', protocol: 'https://', apiKey: '' },
+                showEditor: false,
+                editingFile: null,
+                fileContent: '',
+                showRemoteUpload: false,
+                remoteUrl: '',
+                bookmarks: [],
+
+                editingServerIdx: null,
+                currentPath: '/',
+                files: [],
+                loading: false,
+                selectedItems: [],
+                openServerManager: false,
+                showQRScanner: false,
+                qrScanStream: null,
+
+
+                get pathSegments() {
+                    return this.currentPath === '/' ? [] : this.currentPath.split('/').filter(p => p);
+                },
+                get subfolders() {
+                    return this.files.filter(f => f.type === 'directory');
+                },
+
+                toggleSelection(item) {
+                    window.haptic('impactLight');
+                    const idx = this.selectedItems.findIndex(i => i.name === item.name);
+                    if (idx > -1) {
+                        this.selectedItems.splice(idx, 1);
+                    } else {
+                        this.selectedItems.push(item);
+                    }
+                },
+
+                clearSelection() {
+                    this.selectedItems = [];
+                },
+
+
+                async init() {
+                    // Trigger fingerprint/biometric authentication on app launch
+                    if (window.Fingerprint) {
+                        try {
+                            await new Promise((resolve, reject) => {
+                                window.Fingerprint.isAvailable(() => {
+                                    window.Fingerprint.show({
+                                        clientId: "ServerLuxe",
+                                        clientSecret: "password",
+                                        disableBackup: true,
+                                        title: 'Authenticate',
+                                        subtitle: 'Unlock Application'
+                                    }, () => resolve(), (err) => reject(err));
+                                }, (error) => {
+                                    console.log('Biometric auth not available, skipping.', error);
+                                    resolve();
+                                });
+                            });
+                        } catch (e) {
+                            console.log('Biometric auth failed or cancelled:', e);
+                            window.haptic('error');
+                            window.uiAlert('Authentication cancelled. App will close.');
+                            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+                                window.Capacitor.Plugins.App.exitApp();
+                            }
+                            return;
+                        }
+                    }
+
+                    let saved = localStorage.getItem('fileluxe_mobile_bookmarks');
+                    if (saved) this.bookmarks = JSON.parse(saved);
+
+                    let last = localStorage.getItem('ftp_last_server');
+                    // Start manually; removed autoselect.
+                },
+
+                async startQRScanner() {
+                    // Check for secure context (required for camera)
+                    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.includes('capacitor')) {
+                        window.uiAlert('Camera access requires a secure connection (HTTPS). If you are using an IP address, please use HTTPS.');
+                        return;
+                    }
+
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        window.uiAlert('Your browser or device does not support camera access.');
+                        return;
+                    }
+
+                    try {
+                        // Fallback to pure HTML5 permission stream
+                        // Trigger permission prompt immediately to preserve user gesture
+                        const stream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            }
+                        });
+
+                        this.qrScanStream = stream;
+                        this.showQRScanner = true;
+                        this.openServerManager = false;
+
+                        this.$nextTick(() => {
+                            const video = document.getElementById('qrVideo');
+                            if (video) {
+                                video.srcObject = stream;
+                                video.setAttribute('playsinline', true);
+                                video.play();
+                                this.scanLoop();
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Camera Error:', err);
+                        let msg = 'Camera access failed: ' + err.message;
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            msg = 'CAMERA PERMISSION DENIED.\n\nPlease fix this:\n1. Open Android SETTINGS\n2. Go to APPS > FMLuxe\n3. Select PERMISSIONS\n4. Select CAMERA > ALLOW';
+                        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                            msg = 'No camera found on this device.';
+                        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                            msg = 'Camera is already in use or busy. Please close other apps using the camera.';
+                        }
+                        window.uiAlert(msg);
+                        this.showQRScanner = false;
+                    }
+                },
+
+
+                stopQRScanner() {
+                    this.showQRScanner = false;
+                    if (this.qrScanStream) {
+                        this.qrScanStream.getTracks().forEach(track => track.stop());
+                        this.qrScanStream = null;
+                    }
+                },
+
+                scanLoop() {
+                    if (!this.showQRScanner) return;
+                    const video = document.getElementById('qrVideo');
+                    const canvas = document.getElementById('qrCanvas');
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.height = video.videoHeight;
+                        canvas.width = video.videoWidth;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'attemptBoth',
+                        });
+                        if (code) {
+                            try {
+                                const data = JSON.parse(code.data);
+                                if (data.url && data.name) {
+                                    // Check for correct QR type (File Manager expects 'fm' type)
+                                    if (data.type && data.type !== 'fm') {
+                                        window.haptic('error');
+                                        this.stopQRScanner();
+                                        window.uiAlert('Invalid QR Type: This QR is for ' + (data.type === 'sql' ? 'SQL Manager' : data.type) + '. Please use the correct app section.');
+                                        return;
+                                    }
+
+                                    window.haptic('success');
+                                    this.stopQRScanner();
+                                    this.tempServer = {
+                                        name: data.name,
+                                        url: data.url,
+                                        apiKey: data.apiKey || '', // Note: API key not auto-populated from QR code anymore
+                                        protocol: data.url.startsWith('https') ? 'https://' : 'http://',
+                                        domainUrl: data.url.replace('https://', '').replace('http://', '')
+                                    };
+                                    this.showAddServer = true;
+                                    window.uiAlert('QR Code Scanned! Server details filled.');
+                                    return;
+                                }
+                            } catch (e) {
+                                // Not a valid JSON or doesn't have required fields, keep scanning
+                            }
+                        }
+                    }
+                    requestAnimationFrame(() => this.scanLoop());
+                },
+
+                async exportNodes() {
+                    if (this.servers.length === 0) {
+                        return window.uiAlert('No nodes to export.');
+                    }
+
+                    const now = new Date();
+                    const dateStr = String(now.getDate()).padStart(2, '0') + '-' +
+                        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                        now.getFullYear();
+                    const defaultName = `ServerLuxe-(${dateStr}).json`;
+
+                    const fileName = await window.uiPrompt("Enter filename to save:", defaultName);
+                    if (!fileName) return;
+
+                    try {
+                        const dataStr = JSON.stringify(this.servers, null, 2);
+                        const blob = new Blob([dataStr], { type: 'application/json' });
+
+                        // If browser supports Modern File System Access API
+                        if (window.showSaveFilePicker) {
+                            try {
+                                const handle = await window.showSaveFilePicker({
+                                    suggestedName: fileName,
+                                    types: [{
+                                        description: 'JSON Files',
+                                        accept: { 'application/json': ['.json'] },
+                                    }],
+                                });
+                                const writable = await handle.createWritable();
+                                await writable.write(blob);
+                                await writable.close();
+                                return;
+                            } catch (e) {
+                                // Fallback to standard download if user cancels or API fails
+                                if (e.name === 'AbortError') return;
+                            }
+                        }
+
+                        // Fallback: Standard anchor download
+                        const url = URL.createObjectURL(blob);
+                        const dlAnchorElem = document.createElement('a');
+                        dlAnchorElem.setAttribute("href", url);
+                        dlAnchorElem.setAttribute("download", fileName.endsWith('.json') ? fileName : fileName + '.json');
+                        document.body.appendChild(dlAnchorElem);
+                        dlAnchorElem.click();
+                        setTimeout(() => {
+                            document.body.removeChild(dlAnchorElem);
+                            URL.revokeObjectURL(url);
+                        }, 100);
+                    } catch (err) {
+                        window.uiAlert('Export failed: ' + err.message);
+                    }
+                },
+
+
+                importNodes(ev) {
+                    const file = ev.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (re) => {
+                        try {
+                            const imported = JSON.parse(re.target.result);
+                            if (Array.isArray(imported)) {
+                                this.servers = imported;
+                                localStorage.setItem('ftp_servers', JSON.stringify(this.servers));
+                                window.uiAlert('Nodes successfully imported!');
+                            } else {
+                                window.uiAlert('Invalid file: Root element must be an array.');
+                            }
+                        } catch (err) {
+                            window.uiAlert('Import error: ' + err.message);
+                        }
+                    };
+                    reader.onerror = () => window.uiAlert('Failed to read file.');
+                    reader.readAsText(file);
+                    ev.target.value = '';
+                },
+
+
+
+
+                saveServer() {
+                    if (!this.tempServer.domainUrl) return window.uiAlert("Please provide the domain/path");
+                    this.tempServer.url = this.tempServer.protocol + this.tempServer.domainUrl;
+
+                    if (!this.tempServer.name || !this.tempServer.url) return window.uiAlert('Fill required fields');
+                    if (this.editingServerIdx !== null) {
+                        this.servers[this.editingServerIdx] = JSON.parse(JSON.stringify(this.tempServer));
+                    } else {
+                        this.servers.push(JSON.parse(JSON.stringify(this.tempServer)));
+                    }
+                    localStorage.setItem('ftp_servers', JSON.stringify(this.servers));
+                    window.haptic('success');
+                    this.showAddServer = false;
+                    this.editingServerIdx = null;
+                },
+
+                editServer(idx) {
+                    let s = JSON.parse(JSON.stringify(this.servers[idx]));
+                    let protocol = 'https://';
+                    let domainUrl = s.url || '';
+                    if (domainUrl.startsWith('http://')) { protocol = 'http://'; domainUrl = domainUrl.replace('http://', ''); }
+                    if (domainUrl.startsWith('https://')) { protocol = 'https://'; domainUrl = domainUrl.replace('https://', ''); }
+
+                    this.tempServer = { ...s, protocol, domainUrl };
+                    this.editingServerIdx = idx;
+                    this.openServerManager = false;
+                    this.showAddServer = true;
+                },
+
+                async removeServer(idx) {
+                    const s = this.servers[idx];
+                    if (await window.uiConfirm("Are you sure you want to remove the node \"" + s.name + "\"?")) {
+                        this.servers.splice(idx, 1);
+                        localStorage.setItem('ftp_servers', JSON.stringify(this.servers));
+                        window.haptic('warning');
+                        if (this.servers.length === 0) {
+                            this.currentServer = null;
+                            localStorage.removeItem('ftp_last_server');
+                        }
+                    }
+                },
+
+                selectServer(s) {
+                    window.haptic('impactLight');
+                    this.currentServer = s;
+                    localStorage.setItem('ftp_last_server', s.url);
+                    this.currentPath = ''; // Server will return initial path
+                    this.fetchFiles('');
+                },
+
+
+                async apiReq(params, method = 'POST', isFormData = false) {
+                    if (!this.currentServer) return null;
+                    this.loading = true;
+                    try {
+                        let url = new URL(this.currentServer.url);
+                        let headers = {
+                            'X-API-KEY': this.currentServer.apiKey || '2026'
+                        };
+
+                        let body = null;
+
+                        if (method === 'GET') {
+                            Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+                        } else {
+                            if (isFormData) {
+                                body = params; // params is already FormData
+                            } else {
+                                body = new FormData();
+                                Object.keys(params).forEach(k => body.append(k, params[k]));
+                            }
+                        }
+
+                        let res = await fetch(url, { method, headers, body });
+                        let data = await res.json();
+                        this.loading = false;
+                        if (data.error) {
+                            window.uiAlert(data.error);
+                            return null;
+                        }
+                        return data;
+                    } catch (e) {
+                        this.loading = false;
+                        window.uiAlert("API Error: " + e.message);
+                        return null;
+                    }
+                },
+
+                async fetchFiles(path = '') {
+
+                    let res = await this.apiReq({ ajax: 'files', path: path }, 'GET');
+                    if (res && res.success) {
+
+                        this.files = res.files;
+                        this.currentPath = res.pwd;
+                    }
+                },
+
+                navigateTo(path) {
+                    this.fetchFiles(path);
+                },
+
+                navigateUp() {
+                    if (this.currentPath === '/') {
+                        this.navigateTo('/..');
+                    } else if (this.currentPath.endsWith('..')) {
+                        this.navigateTo(this.currentPath + '/..');
+                    } else {
+                        let parts = this.currentPath.split('/');
+                        parts.pop();
+                        this.navigateTo(parts.join('/') || '/');
+                    }
+                },
+
+                navigateToSegment(index) {
+                    let parts = this.pathSegments.slice(0, index + 1);
+                    this.navigateTo('/' + parts.join('/'));
+                },
+
+                formatSize(bytes) {
+                    if (bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                openItemMenu(item) {
+                    this.activeItem = item;
+                },
+
+                async createFolder() {
+                    if (!this.newFolderName) return;
+                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    let res = await this.apiReq({ action: 'mkdir', dir: target });
+                    if (res && res.success) {
+                        this.showMkdir = false;
+                        this.newFolderName = '';
+                        this.fetchFiles(this.currentPath);
+                    }
+                },
+
+                async createFile() {
+                    if (!this.newFolderName) return;
+                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    // Provide empty content to create file using logic from write
+                    let res = await this.apiReq({ action: 'write', file: target, content: btoa('') });
+                    if (res && res.success) {
+                        this.showNewFile = false;
+                        this.newFolderName = '';
+                        this.fetchFiles(this.currentPath);
+                    }
+                },
+
+                async remoteUpload() {
+                    if (!this.remoteUrl) return;
+                    let res = await this.apiReq({ action: 'remote_upload', url: this.remoteUrl, path: this.currentPath });
+                    if (res && res.success) {
+                        this.showRemoteUpload = false;
+                        this.remoteUrl = '';
+                        this.fetchFiles(this.currentPath);
+                        window.uiAlert('Downloaded: ' + res.filename);
+                    }
+                },
+
+                saveCurrentAsBookmark() {
+                    if (this.bookmarks.includes(this.currentPath)) return;
+                    this.bookmarks.push(this.currentPath);
+                    localStorage.setItem('fileluxe_mobile_bookmarks', JSON.stringify(this.bookmarks));
+                    window.uiAlert('Bookmarked!');
+                },
+
+                removeBookmark(path) {
+                    this.bookmarks = this.bookmarks.filter(p => p !== path);
+                    localStorage.setItem('fileluxe_mobile_bookmarks', JSON.stringify(this.bookmarks));
+                },
+
+                async promptChmod(item) {
+
+                    let val = await window.uiPrompt('Change Permissions Ext (e.g. 0644)', '0644');
+                    if (val) {
+                        let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                        let res = await this.apiReq({ action: 'chmod', file: target, perms: val });
+                        if (res && res.success) {
+                            this.activeItem = null;
+                            this.fetchFiles(this.currentPath);
+                        }
+                    }
+                },
+
+                async promptMove(item, action) {
+                    let destName = await window.uiPrompt((action === 'copy' ? 'Copy to name/path' : 'Move to name/path'), item.name);
+                    if (destName) {
+                        let baseDir = this.currentPath === '/' ? '/' : this.currentPath + '/';
+                        let oldPath = baseDir + item.name;
+                        let newPath = destName.startsWith('/') ? destName : baseDir + destName;
+                        let res = await this.apiReq({ action: action, source: oldPath, dest: newPath });
+                        if (res && res.success) {
+                            this.activeItem = null;
+                            this.fetchFiles(this.currentPath);
+                        }
+                    }
+                },
+
+                async promptZip(item) {
+                    let archiveName = await window.uiPrompt('ZIP Archive Name', item.name + '.zip');
+                    if (archiveName) {
+                        let baseDir = this.currentPath === '/' ? '/' : this.currentPath + '/';
+                        let sourcePath = baseDir + item.name;
+                        let destPath = baseDir + archiveName;
+                        this.loading = true; // might take a while
+                        let res = await this.apiReq({ action: 'zip', source: sourcePath, dest: destPath });
+                        if (res && res.success) {
+                            this.activeItem = null;
+                            this.fetchFiles(this.currentPath);
+                        }
+                    }
+                },
+
+                async unzipItem(item) {
+                    window.haptic('impactLight');
+                    if (!await window.uiConfirm('Extract ' + item.name + ' here?')) return;
+                    let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                    this.loading = true;
+                    let res = await this.apiReq({ action: 'unzip', file: target });
+                    if (res && res.success) {
+                        this.activeItem = null;
+                        this.fetchFiles(this.currentPath);
+                        window.haptic('success');
+                        window.uiAlert('Extracted successfully!');
+                    } else if (res && res.error) {
+                        window.uiAlert('Extraction failed: ' + res.error);
+                    }
+                    this.loading = false;
+                },
+
+                async deleteItem(item) {
+                    if (!await window.uiConfirm('Are you sure you want to delete ' + item.name + '?')) return;
+                    let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                    let res = await this.apiReq({ action: 'delete', file: target });
+                    if (res && res.success) {
+                        this.activeItem = null;
+                        this.selectedItems = this.selectedItems.filter(i => i.name !== item.name);
+                        this.fetchFiles(this.currentPath);
+                    }
+                },
+
+                async deleteSelected() {
+                    if (this.selectedItems.length === 0) return;
+                    if (!await window.uiConfirm('Are you sure you want to delete ' + this.selectedItems.length + ' items?')) return;
+
+                    this.loading = true;
+                    // Delete sequentially
+                    for (let item of this.selectedItems) {
+                        let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                        await this.apiReq({ action: 'delete', file: target });
+                    }
+                    this.clearSelection();
+                    this.fetchFiles(this.currentPath);
+                    this.loading = false;
+                },
+
+                async promptRename(item) {
+                    let newName = await window.uiPrompt('Enter new name for ' + item.name, item.name);
+                    if (newName && newName !== item.name) {
+                        let baseDir = this.currentPath === '/' ? '/' : this.currentPath + '/';
+                        let oldPath = baseDir + item.name;
+                        let newPath = baseDir + newName;
+                        let res = await this.apiReq({ action: 'rename', old: oldPath, new: newPath });
+                        if (res && res.success) {
+                            this.activeItem = null;
+                            this.fetchFiles(this.currentPath);
+                        }
+                    }
+                },
+
+                async uploadFile(e) {
+                    let file = e.target.files[0];
+                    if (!file) return;
+                    let fd = new FormData();
+                    fd.append('action', 'upload');
+                    fd.append('path', this.currentPath);
+                    fd.append('file', file);
+
+                    let res = await this.apiReq(fd, 'POST', true);
+                    if (res && res.success) {
+                        this.fetchFiles(this.currentPath);
+                    }
+                    e.target.value = '';
+                },
+
+                async inspectFile(item) {
+                    // Native editor for easily viewable files
+                    let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                    this.loading = true;
+                    let res = await this.apiReq({ action: 'read', file: target });
+                    this.loading = false;
+                    if (res && res.success) {
+                        this.editingFile = { ...item, fullPath: target };
+                        // Decode base64 to string safely
+                        try {
+                            this.fileContent = decodeURIComponent(atob(res.content).split('').map(function (c) {
+                                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                            }).join(''));
+                            this.showEditor = true;
+                        } catch (e) {
+                            window.uiAlert("File is binary or uses an unsupported encoding.");
+                        }
+                    }
+                },
+
+                async saveFileContent() {
+                    // Encode back to base64
+                    let base64Content = btoa(encodeURIComponent(this.fileContent).replace(/%([0-9A-F]{2})/g,
+                        function toSolidBytes(match, p1) {
+                            return String.fromCharCode('0x' + p1);
+                        }));
+                    let res = await this.apiReq({ action: 'write', file: this.editingFile.fullPath, content: base64Content });
+                    if (res && res.success) {
+                        window.uiAlert('Saved successfully!');
+                        this.showEditor = false;
+                        this.fetchFiles(this.currentPath);
+                    }
+                },
+
+                downloadFile(item) {
+                    let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = this.currentServer.url;
+                    form.target = '_blank';
+
+                    // SECURITY: No longer embedding API key in form field - use header authentication instead
+                    // The download endpoint should use session or header-based auth
+
+                    const action = document.createElement('input');
+                    action.type = 'hidden';
+                    action.name = 'action';
+                    action.value = 'download';
+
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'hidden';
+                    fileInput.name = 'file';
+                    fileInput.value = target;
+
+                    form.appendChild(action);
+                    form.appendChild(fileInput);
+
+                    document.body.appendChild(form);
+                    form.submit();
+                    document.body.removeChild(form);
+                }
+            }));
+        });
+    </script>
+</body>
+
+</html>
