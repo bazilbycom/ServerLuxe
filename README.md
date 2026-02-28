@@ -8,7 +8,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen?style=flat-square)
 
-[🎯 Features](#features) • [📱 Mobile App](#mobile-app) • [⚙️ Modules](#modules) • [🚀 Quick Start](#quick-start) • [📚 Build Guide](#build-documentation) • [🛡️ Security](#security) • [📄 License](#license)
+[🎯 Features](#features) • [📸 Gallery](#gallery) • [📱 Mobile App](#mobile-app) • [⚙️ Modules](#modules) • [🚀 Quick Start](#quick-start) • [📚 Build Guide](#build-documentation) • [🛡️ Security](#security) • [📄 License](#license)
 
 </div>
 
@@ -26,7 +26,35 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 ---
 
-## 📱 Mobile App
+## 📸 Gallery
+
+<div align="center">
+  <h3>SQLuxe - Database Management</h3>
+  <img src="screenshots/sqluxe-overview.png" width="800" alt="SQLuxe Overview" />
+  <p><em>Modern database dashboard with real-time stats and query builder</em></p>
+  
+  <br/>
+  
+  <img src="screenshots/sqluxe-table.png" width="800" alt="SQLuxe Table View" />
+  <p><em>Clean, intuitive table data management with cloud-like UI</em></p>
+  
+  <br/>
+  <hr width="50%"/>
+  <br/>
+  
+  <h3>FileLuxe - File Management</h3>
+  <img src="screenshots/fileluxe-overview.png" width="800" alt="FileLuxe Explorer" />
+  <p><em>Lightning-fast file explorer with glassmorphism design</em></p>
+  
+  <br/>
+  
+  <img src="screenshots/fileluxe-actions.png" width="400" alt="FileLuxe Actions" />
+  <p><em>Powerful contextual actions for remote files and directories</em></p>
+</div>
+
+---
+
+## �📱 Mobile App
 
 ### Android App (Available on Google Play)
 
