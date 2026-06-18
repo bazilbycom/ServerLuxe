@@ -185,7 +185,7 @@ ServerLuxe supports a **one-file automated remote installation**:
    
    Once submitted, the installer will automatically:
    * Write your secure `.env` configuration file.
-   * Download the latest versions of `db.php`, `fm.php`, and `mcp-bridge.js` directly from the official GitHub repository.
+   * Download the latest versions of `db.php`, `fm.php`, `mcp-bridge.js`, and `mcp_docs.md` directly from the official GitHub repository.
    * Configure permissions automatically.
    
 4. **All Set!**
