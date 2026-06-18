@@ -118,7 +118,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed)
 
         if (file_put_contents($env_file, $env_content) !== false) {
             // Download rest of files
-            $files_to_download = ['db.php', 'fm.php', 'mcp-bridge.js'];
+            $files_to_download = ['db.php', 'fm.php', 'mcp-bridge.js', 'mcp_docs.md'];
             $download_errors = [];
             
             foreach ($files_to_download as $file) {
