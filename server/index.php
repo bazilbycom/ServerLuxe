@@ -84,8 +84,8 @@ function download_installer_file($filename) {
 if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed) {
     $master_pass = $_POST['master_pass'] ?? '';
     $api_key = $_POST['api_key'] ?? '';
-    $host = $_POST['host'] ?? '';
-    $port = $_POST['port'] ?? '';
+    $host = !empty($_POST['host']) ? $_POST['host'] : 'localhost';
+    $port = !empty($_POST['port']) ? $_POST['port'] : '3306';
     $user = $_POST['user'] ?? '';
     $pass = $_POST['pass'] ?? '';
     $db_name = $_POST['database'] ?? '';
