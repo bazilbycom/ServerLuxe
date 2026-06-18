@@ -10,12 +10,16 @@ session_start();
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowed = false;
 
-// Exact match for capacitor
+// Exact match for capacitor (iOS)
 if ($origin === 'capacitor://localhost') {
     $allowed = true;
 }
-// Localhost with any port (e.g., http://localhost:8080)
-elseif (preg_match('#^http://localhost(:\d+)?$#', $origin)) {
+// Localhost with any port (e.g., http://localhost:8080) - Android Capacitor
+elseif (preg_match('#^https?://localhost(:\d+)?$#', $origin)) {
+    $allowed = true;
+}
+// Some Android WebView versions send null origin
+elseif ($origin === 'null' || $origin === '') {
     $allowed = true;
 }
 
@@ -44,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', $_ENV['VERSION'] ?? '1.1.0');
+define('VERSION', $_ENV['VERSION'] ?? '1.2.1');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? '127.0.0.1');
@@ -218,6 +222,377 @@ function connect_with_config($config, $silent = false) {
     } catch (PDOException $e) {
         if (!$silent) error_log("[SQLuxe] DB Connection Failed: " . $e->getMessage());
         return "Connection failed: " . $e->getMessage();
+    }
+}
+
+// ============ MCP & AUTO-UPDATE INTEGRATION ============
+
+function load_mcp_config() {
+    $config_file = __DIR__ . '/mcp_config.json';
+    if (file_exists($config_file)) {
+        return json_decode(file_get_contents($config_file), true) ?: ['databases' => [], 'folders' => []];
+    }
+    return ['databases' => [], 'folders' => []];
+}
+
+function save_mcp_config($config) {
+    $config_file = __DIR__ . '/mcp_config.json';
+    return file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+}
+
+function has_mcp_permission($type, $name, $access_type) {
+    $config = load_mcp_config();
+    if (!isset($config[$type])) return false;
+    
+    if ($type === 'folders') {
+        $name_real = realpath($name);
+        if ($name_real === false) return false;
+        $name_normalized = str_replace('\\', '/', $name_real);
+        foreach ($config['folders'] as $path => $perms) {
+            $path_real = realpath($path);
+            if ($path_real === false) continue;
+            $path_normalized = str_replace('\\', '/', $path_real);
+            if (stripos($name_normalized, $path_normalized) === 0) {
+                return !empty($perms[$access_type]);
+            }
+        }
+        return false;
+    }
+    
+    return !empty($config[$type][$name][$access_type]);
+}
+
+function check_for_updates() {
+    $repo = 'bazilbycom/ServerLuxe';
+    $branch = 'main';
+    $git_available = false;
+    $git_update_available = false;
+    $local_hash = '';
+    $remote_hash = '';
+    $commits_behind = 0;
+    
+    if (is_dir(__DIR__ . '/../.git')) {
+        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
+        if (trim($git_check) === 'true') {
+            $git_available = true;
+            @shell_exec('git fetch origin main 2>&1');
+            $local_hash = trim(@shell_exec('git rev-parse HEAD') ?? '');
+            $remote_hash = trim(@shell_exec('git rev-parse origin/main') ?? '');
+            if ($local_hash !== $remote_hash && $local_hash !== '' && $remote_hash !== '') {
+                $git_update_available = true;
+                $commits_behind = (int)trim(@shell_exec('git rev-list --count HEAD..origin/main') ?? '0');
+            }
+        }
+    }
+    
+    $remote_version = VERSION;
+    $http_update_available = false;
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+        ]
+    ];
+    $context = stream_context_create($opts);
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
+    
+    if ($github_db) {
+        if (preg_match("/define\('VERSION',\s*'([^']+)'\)/", $github_db, $matches)) {
+            $remote_version = $matches[1];
+            if (version_compare(VERSION, $remote_version, '<')) {
+                $http_update_available = true;
+            }
+        }
+    }
+    
+    return [
+        'git_available' => $git_available,
+        'git_update_available' => $git_update_available,
+        'http_update_available' => $http_update_available,
+        'update_available' => ($git_update_available || $http_update_available),
+        'current_version' => VERSION,
+        'latest_version' => $remote_version,
+        'commits_behind' => $commits_behind,
+        'local_hash' => substr($local_hash, 0, 7),
+        'remote_hash' => substr($remote_hash, 0, 7)
+    ];
+}
+
+function apply_update() {
+    $repo = 'bazilbycom/ServerLuxe';
+    $branch = 'main';
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+        ]
+    ];
+    $context = stream_context_create($opts);
+    
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
+    $github_fm = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php", false, $context);
+    
+    if (!$github_db || !$github_fm) {
+        return "Failed to download update files from GitHub.";
+    }
+    
+    $current_db_pass = '';
+    $current_fm_pass = '';
+    $db_file_path = __DIR__ . '/' . (defined('DB_FILE') ? DB_FILE : 'db.php');
+    $fm_file_path = __DIR__ . '/' . (defined('FM_FILE') ? FM_FILE : 'fm.php');
+    $current_db_file = '';
+    $current_fm_file = '';
+    
+    if (file_exists($db_file_path)) {
+        $old_db = file_get_contents($db_file_path);
+        if (preg_match("/define\('MASTER_PASS',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_db_pass = $m[1];
+        }
+        if (preg_match("/define\('DB_FILE',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_db_file = $m[1];
+        }
+        if (preg_match("/define\('FM_FILE',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_fm_file = $m[1];
+        }
+    }
+    
+    if (file_exists($fm_file_path)) {
+        $old_fm = file_get_contents($fm_file_path);
+        if (preg_match("/define\('MASTER_PASS',\s*'([^']*)'\)/", $old_fm, $m)) {
+            $current_fm_pass = $m[1];
+        }
+    }
+    
+    if ($current_db_pass !== '') {
+        $github_db = preg_replace("/define\('MASTER_PASS',\s*'[^']*'\)/", "define('MASTER_PASS', '{$current_db_pass}')", $github_db);
+    }
+    if ($current_fm_pass !== '') {
+        $github_fm = preg_replace("/define\('MASTER_PASS',\s*'[^']*'\)/", "define('MASTER_PASS', '{$current_fm_pass}')", $github_fm);
+    }
+    if ($current_db_file !== '') {
+        $github_db = preg_replace("/define\('DB_FILE',\s*'[^']*'\)/", "define('DB_FILE', '{$current_db_file}')", $github_db);
+        $github_fm = preg_replace("/define\('DB_FILE',\s*'[^']*'\)/", "define('DB_FILE', '{$current_db_file}')", $github_fm);
+    }
+    if ($current_fm_file !== '') {
+        $github_db = preg_replace("/define\('FM_FILE',\s*'[^']*'\)/", "define('FM_FILE', '{$current_fm_file}')", $github_db);
+        $github_fm = preg_replace("/define\('FM_FILE',\s*'[^']*'\)/", "define('FM_FILE', '{$current_fm_file}')", $github_fm);
+    }
+    
+    if (file_put_contents($db_file_path, $github_db) === false) {
+        return "Failed to write to {$db_file_path}. Check permissions.";
+    }
+    if (file_put_contents($fm_file_path, $github_fm) === false) {
+        return "Failed to write to {$fm_file_path}. Check permissions.";
+    }
+    
+    if (is_dir(__DIR__ . '/../.git')) {
+        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
+        if (trim($git_check) === 'true') {
+            @shell_exec('git reset --hard origin/main 2>&1');
+        }
+    }
+    
+    return true;
+}
+
+// MCP API endpoint
+if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
+    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
+    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+        header('Content-Type: application/json', true, 401);
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = file_get_contents('php://input');
+    $request = json_decode($input, true);
+    if (!$request) {
+        $request = $_POST;
+    }
+    
+    $method = $request['method'] ?? '';
+    $params = $request['params'] ?? [];
+    $id = $request['id'] ?? null;
+    
+    header('Content-Type: application/json');
+    
+    if ($method === 'tools/list') {
+        echo json_encode([
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'result' => [
+                'tools' => [
+                    [
+                        'name' => 'query_database',
+                        'description' => 'Run SQL query on a database. Specify the database name.',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'database' => ['type' => 'string', 'description' => 'Database name'],
+                                'query' => ['type' => 'string', 'description' => 'SQL query to run']
+                            ],
+                            'required' => ['database', 'query']
+                        ]
+                    ],
+                    [
+                        'name' => 'list_tables',
+                        'description' => 'List tables in a database',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'database' => ['type' => 'string', 'description' => 'Database name']
+                            ],
+                            'required' => ['database']
+                        ]
+                    ],
+                    [
+                        'name' => 'describe_table',
+                        'description' => 'Get description/columns of a table',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'database' => ['type' => 'string', 'description' => 'Database name'],
+                                'table' => ['type' => 'string', 'description' => 'Table name']
+                            ],
+                            'required' => ['database', 'table']
+                        ]
+                    ]
+                ]
+            ]
+        ]);
+        exit;
+    }
+    
+    if ($method === 'tools/call') {
+        $tool = $params['name'] ?? '';
+        $arguments = $params['arguments'] ?? [];
+        $result = ['content' => [], 'isError' => false];
+        
+        if ($tool === 'query_database') {
+            $database = $arguments['database'] ?? '';
+            $query = $arguments['query'] ?? '';
+            $is_write = !preg_match('/^(SELECT|SHOW|DESCRIBE|EXPLAIN)\s+/i', trim($query));
+            
+            if (!has_mcp_permission('databases', $database, 'read')) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+            } elseif ($is_write && !has_mcp_permission('databases', $database, 'write')) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to database '{$database}'."];
+            } else {
+                $config = [
+                    'host' => DEFAULT_HOST,
+                    'port' => DEFAULT_PORT,
+                    'username' => DEFAULT_USER,
+                    'password' => DEFAULT_PASS,
+                    'database' => $database
+                ];
+                $conn = connect_with_config($config, true);
+                if (!($conn instanceof PDO)) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+                } else {
+                    try {
+                        $stmt = $conn->prepare($query);
+                        $stmt->execute();
+                        $data = [];
+                        if (!$is_write) {
+                            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        } else {
+                            $data = ['affected_rows' => $stmt->rowCount()];
+                        }
+                        $result['content'][] = ['type' => 'text', 'text' => json_encode($data, JSON_PRETTY_PRINT)];
+                    } catch (PDOException $e) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                    }
+                }
+            }
+        } elseif ($tool === 'list_tables') {
+            $database = $arguments['database'] ?? '';
+            if (!has_mcp_permission('databases', $database, 'read')) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+            } else {
+                $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
+                $conn = connect_with_config($config, true);
+                if (!($conn instanceof PDO)) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+                } else {
+                    try {
+                        $stmt = $conn->query("SHOW TABLES");
+                        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                        $result['content'][] = ['type' => 'text', 'text' => json_encode($tables)];
+                    } catch (PDOException $e) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                    }
+                }
+            }
+        } elseif ($tool === 'describe_table') {
+            $database = $arguments['database'] ?? '';
+            $table = $arguments['table'] ?? '';
+            if (!has_mcp_permission('databases', $database, 'read')) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+            } else {
+                $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
+                $conn = connect_with_config($config, true);
+                if (!($conn instanceof PDO)) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+                } else {
+                    try {
+                        $stmt = $conn->query("DESCRIBE `$table`");
+                        $cols = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        $result['content'][] = ['type' => 'text', 'text' => json_encode($cols, JSON_PRETTY_PRINT)];
+                    } catch (PDOException $e) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                    }
+                }
+            }
+        } else {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
+        }
+        echo json_encode(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result]);
+        exit;
+    }
+}
+
+// Handle Update Checking & Config API
+if (isset($_SESSION['db_config']) || is_api_request()) {
+    if (isset($_GET['action']) && $_GET['action'] === 'check_updates') {
+        header('Content-Type: application/json');
+        echo json_encode(check_for_updates());
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'apply_update') {
+        validate_csrf();
+        header('Content-Type: application/json');
+        $res = apply_update();
+        if ($res === true) {
+            echo json_encode(['success' => true]);
+        } else {
+            header('Content-Type: application/json', true, 500);
+            echo json_encode(['error' => $res]);
+        }
+        exit;
+    }
+    if (isset($_GET['action']) && $_GET['action'] === 'get_mcp_config') {
+        header('Content-Type: application/json');
+        echo json_encode(load_mcp_config());
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
+        validate_csrf();
+        $input = json_decode($_POST['config'] ?? '{}', true);
+        save_mcp_config($input);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true]);
+        exit;
     }
 }
 
@@ -408,7 +783,7 @@ if ((isset($_SESSION['db_config']) || is_api_request()) && isset($_POST['action'
 }
 
 // Handle Raw SQL Execution
-if (isset($_SESSION['db_config']) && isset($_POST['action']) && $_POST['action'] === 'execute_sql') {
+if ((isset($_SESSION['db_config']) || is_api_request()) && isset($_POST['action']) && $_POST['action'] === 'execute_sql') {
     validate_csrf();
     // Allow SELECT queries even in read-only mode if we want, but simpler to block raw SQL execution entirely for now.
     // Or we could check if it starts with SELECT/SHOW/DESCRIBE
@@ -913,6 +1288,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'toggle_readonly') {
     exit;
 }
 
+// Auth handled at app level (fingerprint). Auto-connect with defaults for web browser access.
+if (!isset($_SESSION['db_config']) && !is_api_request()) {
+    $_SESSION['db_config'] = [
+        'host'     => DEFAULT_HOST,
+        'port'     => DEFAULT_PORT,
+        'username' => DEFAULT_USER,
+        'password' => DEFAULT_PASS,
+        'database' => '',
+    ];
+}
+
 $db = get_db_connection();
 $isConnected = ($db instanceof PDO);
 
@@ -1303,6 +1689,10 @@ if ($isConnected) {
                         <button @click="openCreateTableModal" class="table-link" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed;' : ''" style="padding: 0.5rem 0.75rem;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM3 9h18M9 3v18"/></svg>
                             Create New Table
+                        </button>
+                        <button @click="openMcpModal" class="table-link" style="padding: 0.5rem 0.75rem; color: var(--accent);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            MCP & Auto-Update
                         </button>
                     </div>
                 </div>
@@ -1888,6 +2278,161 @@ if ($isConnected) {
                 </div>
             </div>
 
+            <!-- MCP & Auto-Update Modal -->
+            <div class="modal-overlay" x-show="showMcpModal" x-cloak x-transition>
+                <div class="modal-card" style="max-width: 700px; width: 95%; height: 80vh;" @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
+                    <div class="modal-header">
+                        <div class="flex items-center gap-2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            <h3 style="font-weight: 700;">MCP & Auto-Update Panel</h3>
+                        </div>
+                        <button @click="showMcpModal = false" class="btn btn-ghost" style="padding: 0.25rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    
+                    <div style="padding: 0 1.5rem; border-bottom: 1px solid var(--border);">
+                        <div class="tabs" style="margin-bottom: 0;">
+                            <div class="tab" :class="subTab === 'mcp' ? 'active' : ''" @click="subTab = 'mcp'">AI & MCP Permissions</div>
+                            <div class="tab" :class="subTab === 'update' ? 'active' : ''" @click="subTab = 'update'">System Auto-Update</div>
+                        </div>
+                    </div>
+
+                    <div class="modal-body" style="overflow-y: auto; flex: 1;">
+                        
+                        <!-- MCP Tab -->
+                        <div x-show="subTab === 'mcp'" class="flex flex-col gap-4">
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                                Grant specific read/write access to AI clients connecting via Model Context Protocol (MCP).
+                            </p>
+                            
+                            <!-- Databases Permissions -->
+                            <div>
+                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Database Access Rules</h4>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1);">
+                                                <th style="text-align: left; padding: 0.5rem 1rem;">Database</th>
+                                                <th style="text-align: center; padding: 0.5rem; width: 80px;">Read</th>
+                                                <th style="text-align: center; padding: 0.5rem; width: 80px;">Write</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="(perms, dbName) in mcpConfig.databases" :key="dbName">
+                                                <tr style="border-bottom: 1px solid var(--border);">
+                                                    <td style="padding: 0.5rem 1rem; font-weight: 600;" x-text="dbName"></td>
+                                                    <td style="text-align: center; padding: 0.5rem;">
+                                                        <input type="checkbox" x-model="perms.read">
+                                                    </td>
+                                                    <td style="text-align: center; padding: 0.5rem;">
+                                                        <input type="checkbox" x-model="perms.write">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Folders Permissions -->
+                            <div>
+                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Folder Access Rules</h4>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.5rem;">
+                                    <div class="flex gap-2" style="margin-bottom: 1rem;">
+                                        <input type="text" x-model="newMcpFolder" class="input-control" placeholder="Absolute folder path (e.g. /var/www)" style="font-size: 0.8rem; padding: 0.5rem;">
+                                        <button @click="addMcpFolder" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Add Path</button>
+                                    </div>
+                                    <div class="flex flex-col gap-2">
+                                        <template x-for="(perms, path) in mcpConfig.folders" :key="path">
+                                            <div class="flex items-center justify-between" style="padding: 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md);">
+                                                <span style="font-size: 0.75rem; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;" x-text="path"></span>
+                                                <div class="flex items-center gap-4">
+                                                    <label class="flex items-center gap-1" style="font-size: 0.75rem;">
+                                                        <input type="checkbox" x-model="perms.read"> R
+                                                    </label>
+                                                    <label class="flex items-center gap-1" style="font-size: 0.75rem;">
+                                                        <input type="checkbox" x-model="perms.write"> W
+                                                    </label>
+                                                    <button @click="removeMcpFolder(path)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;">&times;</button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="Object.keys(mcpConfig.folders || {}).length === 0">
+                                            <span style="color: var(--text-secondary); font-size: 0.75rem; text-align: center; display: block; opacity: 0.6;">No folders configured.</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Setup Instructions -->
+                            <div>
+                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                                <div style="background: #000; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.75rem; color: #fff; overflow-x: auto;">
+                                    <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">{
+  "mcpServers": {
+    "serverluxe": {
+      "command": "node",
+      "args": [
+        "<?php echo str_replace('\\', '/', __DIR__ . '/mcp-bridge.js'); ?>",
+        "--url", "<?php 
+           $proto = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+           echo $proto . '://' . $_SERVER['HTTP_HOST'] . strtok($_SERVER['REQUEST_URI'], '?'); 
+        ?>",
+        "--key", "<?php echo htmlspecialchars(API_KEY); ?>"
+      ]
+    }
+  }
+}</pre>
+                                </div>
+                                <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server.
+                                </span>
+                            </div>
+
+                            <button @click="saveMcpConfig" class="btn btn-primary" style="margin-top: 1rem;">Save Permissions</button>
+                        </div>
+
+                        <!-- Updates Tab -->
+                        <div x-show="subTab === 'update'" class="flex flex-col gap-4">
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; text-align: center;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Current Version</div>
+                                <div style="font-size: 2.5rem; font-weight: 800; color: #fff; line-height: 1;" x-text="updateInfo.current"></div>
+                                
+                                <div style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem;">
+                                    <button @click="checkUpdates" class="btn btn-ghost" :disabled="updateInfo.loading" style="padding: 0.5rem 1.5rem; font-size: 0.85rem;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="updateInfo.loading ? 'animate-spin' : ''" style="margin-right: 0.25rem;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                        Check for Updates
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Update Results -->
+                            <div x-show="updateInfo.checked" x-cloak style="background: rgba(34, 211, 238, 0.05); border: 1px solid rgba(34, 211, 238, 0.2); border-radius: var(--radius-md); padding: 1rem;">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 0.9rem; color: var(--accent);" x-show="updateInfo.available">Update Available!</div>
+                                        <div style="font-weight: 700; font-size: 0.9rem; color: var(--success);" x-show="!updateInfo.available">You are up to date!</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                            Latest version on GitHub: <span style="font-weight: 700; color:#fff;" x-text="updateInfo.latest"></span>
+                                        </div>
+                                        <div x-show="updateInfo.commitsBehind > 0" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                            Commits behind main: <span style="font-weight:700; color:#fff;" x-text="updateInfo.commitsBehind"></span>
+                                        </div>
+                                    </div>
+                                    <button x-show="updateInfo.available" @click="triggerUpdate" class="btn btn-primary" :disabled="updateInfo.loading" style="padding: 0.5rem 1rem; font-size: 0.8rem; margin: 0; background: var(--danger); color: #fff;">
+                                        Update Now
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div x-show="updateInfo.error" x-cloak style="color: var(--danger); font-size: 0.8rem; text-align: center;" x-text="updateInfo.error"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
             <!-- Process Monitor Modal -->
             <div class="modal-overlay" x-show="showProcessModal" x-cloak x-transition>
                 <div class="modal-card" style="max-width: 1000px; width: 95%; height: 80vh;" @click.outside="showProcessModal = false">
@@ -2030,6 +2575,11 @@ if ($isConnected) {
                 snippets: JSON.parse(localStorage.getItem('sqluxe_snippets') || '[]'),
                 processes: [],
                 showProcessModal: false,
+                showMcpModal: false,
+                allDatabases: <?php echo json_encode($databases); ?>,
+                mcpConfig: { databases: {}, folders: {} },
+                newMcpFolder: '',
+                updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
                 isReadOnly: <?php echo !empty($_SESSION['read_only']) ? 'true' : 'false'; ?>,
                 csrfToken: '<?php echo $_SESSION['csrf_token']; ?>',
                 newTable: { name: '', columns: [{ name: 'id', type: 'INT', length: '11', primary: true, ai: true, null: false }] },
@@ -2204,6 +2754,94 @@ if ($isConnected) {
                         } else alert(data.error);
                     } catch (e) { alert('Optimization failed'); }
                     finally { this.loading = false; }
+                },
+                async openMcpModal() {
+                    this.showMcpModal = true;
+                    this.loading = true;
+                    try {
+                        const res = await fetch('?action=get_mcp_config');
+                        this.mcpConfig = await res.json();
+                        if (!this.mcpConfig.databases) this.mcpConfig.databases = {};
+                        if (!this.mcpConfig.folders) this.mcpConfig.folders = {};
+                        
+                        this.allDatabases.forEach(db => {
+                            if (!this.mcpConfig.databases[db]) {
+                                this.mcpConfig.databases[db] = { read: false, write: false };
+                            }
+                        });
+                    } catch(e) {
+                        console.error('Failed to load MCP config:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                addMcpFolder() {
+                    if (!this.newMcpFolder) return;
+                    if (!this.mcpConfig.folders[this.newMcpFolder]) {
+                        this.mcpConfig.folders[this.newMcpFolder] = { read: true, write: false };
+                    }
+                    this.newMcpFolder = '';
+                },
+                removeMcpFolder(folder) {
+                    delete this.mcpConfig.folders[folder];
+                },
+                async saveMcpConfig() {
+                    this.loading = true;
+                    const fd = new FormData();
+                    fd.append('action', 'save_mcp_config');
+                    fd.append('config', JSON.stringify(this.mcpConfig));
+                    fd.append('csrf_token', this.csrfToken);
+                    try {
+                        const res = await fetch('', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('MCP Configuration saved successfully!');
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch(e) {
+                        alert('Failed to save configuration.');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async checkUpdates() {
+                    this.updateInfo.loading = true;
+                    this.updateInfo.error = '';
+                    try {
+                        const res = await fetch('?action=check_updates');
+                        const data = await res.json();
+                        this.updateInfo.checked = true;
+                        this.updateInfo.available = data.update_available;
+                        this.updateInfo.current = data.current_version;
+                        this.updateInfo.latest = data.latest_version;
+                        this.updateInfo.commitsBehind = data.commits_behind;
+                    } catch(e) {
+                        this.updateInfo.error = 'Failed to check for updates.';
+                    } finally {
+                        this.updateInfo.loading = false;
+                    }
+                },
+                async triggerUpdate() {
+                    if (!confirm('Are you sure you want to update SQLuxe & FileLuxe now? This will overwrite db.php and fm.php.')) return;
+                    this.updateInfo.loading = true;
+                    const fd = new FormData();
+                    fd.append('action', 'apply_update');
+                    fd.append('csrf_token', this.csrfToken);
+                    try {
+                        const res = await fetch('', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('Updates applied successfully! The page will now reload.');
+                            location.reload();
+                        } else {
+                            alert('Update failed: ' + data.error);
+                        }
+                    } catch(e) {
+                        alert('Failed to apply update.');
+                    } finally {
+                        this.updateInfo.loading = false;
+                    }
                 },
                 async fetchProcesses() {
                     this.showProcessModal = true;

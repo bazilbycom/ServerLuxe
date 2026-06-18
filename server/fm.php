@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Web File Manager - FMLuxe (Local File System)
  * Single-file management tool for interacting with server files.
@@ -10,12 +10,16 @@ session_start();
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowed = false;
 
-// Exact match for capacitor
+// Exact match for capacitor (iOS)
 if ($origin === 'capacitor://localhost') {
     $allowed = true;
 }
-// Localhost with any port (e.g., http://localhost:8080)
-elseif (preg_match('#^http://localhost(:\d+)?$#', $origin)) {
+// Localhost with any port (e.g., http://localhost:8080) - Android Capacitor
+elseif (preg_match('#^https?://localhost(:\d+)?$#', $origin)) {
+    $allowed = true;
+}
+// Some Android WebView versions send null origin
+elseif ($origin === 'null' || $origin === '') {
     $allowed = true;
 }
 
@@ -45,6 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
+define('VERSION', $_ENV['VERSION'] ?? '1.2.1');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -115,7 +120,6 @@ function validate_path($base_dir, $user_path) {
     return ['valid' => true, 'path' => $real_path, 'normalized' => $normalized];
 }
 
-// SECURITY: Password hashing with bcrypt and auto-migration from plaintext
 define('SESSION_TIMEOUT', 1800); // 30 minutes
 
 function verify_master_password($provided_pass) {
@@ -125,37 +129,7 @@ function verify_master_password($provided_pass) {
         return false;
     }
 
-    // Check if password is already hashed (bcrypt starts with $2y$)
-    if (strpos($master_pass, '$2y$') === 0) {
-        return password_verify($provided_pass, $master_pass);
-    }
-
-    // Legacy plaintext comparison
-    if (hash_equals($master_pass, $provided_pass)) {
-        // Password correct - upgrade to bcrypt
-        upgrade_master_password($provided_pass);
-        return true;
-    }
-
-    return false;
-}
-
-function upgrade_master_password($plaintext) {
-    $hash = password_hash($plaintext, PASSWORD_BCRYPT);
-    $env_path = __DIR__ . '/.env';
-
-    if (!file_exists($env_path)) return;
-
-    $content = file_get_contents($env_path);
-
-    // Replace MASTER_PASS line
-    $content = preg_replace(
-        '/^MASTER_PASS=.*/m',
-        'MASTER_PASS=' . $hash,
-        $content
-    );
-
-    @file_put_contents($env_path, $content);
+    return hash_equals($master_pass, $provided_pass);
 }
 
 // SECURITY: Session timeout and regeneration
@@ -265,6 +239,380 @@ function is_api_request() {
     return false;
 }
 
+// ============ MCP & AUTO-UPDATE INTEGRATION ============
+
+function load_mcp_config() {
+    $config_file = __DIR__ . '/mcp_config.json';
+    if (file_exists($config_file)) {
+        return json_decode(file_get_contents($config_file), true) ?: ['databases' => [], 'folders' => []];
+    }
+    return ['databases' => [], 'folders' => []];
+}
+
+function save_mcp_config($config) {
+    $config_file = __DIR__ . '/mcp_config.json';
+    return file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+}
+
+function has_mcp_permission($type, $name, $access_type) {
+    $config = load_mcp_config();
+    if (!isset($config[$type])) return false;
+    
+    if ($type === 'folders') {
+        $name_real = realpath($name);
+        if ($name_real === false) return false;
+        $name_normalized = str_replace('\\', '/', $name_real);
+        foreach ($config['folders'] as $path => $perms) {
+            $path_real = realpath($path);
+            if ($path_real === false) continue;
+            $path_normalized = str_replace('\\', '/', $path_real);
+            if (stripos($name_normalized, $path_normalized) === 0) {
+                return !empty($perms[$access_type]);
+            }
+        }
+        return false;
+    }
+    
+    return !empty($config[$type][$name][$access_type]);
+}
+
+function check_for_updates() {
+    $repo = 'bazilbycom/ServerLuxe';
+    $branch = 'main';
+    $git_available = false;
+    $git_update_available = false;
+    $local_hash = '';
+    $remote_hash = '';
+    $commits_behind = 0;
+    
+    if (is_dir(__DIR__ . '/../.git')) {
+        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
+        if (trim($git_check) === 'true') {
+            $git_available = true;
+            @shell_exec('git fetch origin main 2>&1');
+            $local_hash = trim(@shell_exec('git rev-parse HEAD') ?? '');
+            $remote_hash = trim(@shell_exec('git rev-parse origin/main') ?? '');
+            if ($local_hash !== $remote_hash && $local_hash !== '' && $remote_hash !== '') {
+                $git_update_available = true;
+                $commits_behind = (int)trim(@shell_exec('git rev-list --count HEAD..origin/main') ?? '0');
+            }
+        }
+    }
+    
+    $remote_version = VERSION;
+    $http_update_available = false;
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+        ]
+    ];
+    $context = stream_context_create($opts);
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
+    
+    if ($github_db) {
+        if (preg_match("/define\('VERSION',\s*'([^']+)'\)/", $github_db, $matches)) {
+            $remote_version = $matches[1];
+            if (version_compare(VERSION, $remote_version, '<')) {
+                $http_update_available = true;
+            }
+        }
+    }
+    
+    return [
+        'git_available' => $git_available,
+        'git_update_available' => $git_update_available,
+        'http_update_available' => $http_update_available,
+        'update_available' => ($git_update_available || $http_update_available),
+        'current_version' => VERSION,
+        'latest_version' => $remote_version,
+        'commits_behind' => $commits_behind,
+        'local_hash' => substr($local_hash, 0, 7),
+        'remote_hash' => substr($remote_hash, 0, 7)
+    ];
+}
+
+function apply_update() {
+    $repo = 'bazilbycom/ServerLuxe';
+    $branch = 'main';
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+        ]
+    ];
+    $context = stream_context_create($opts);
+    
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
+    $github_fm = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php", false, $context);
+    
+    if (!$github_db || !$github_fm) {
+        return "Failed to download update files from GitHub.";
+    }
+    
+    $current_db_pass = '';
+    $current_fm_pass = '';
+    $db_file_path = __DIR__ . '/' . (defined('DB_FILE') ? DB_FILE : 'db.php');
+    $fm_file_path = __DIR__ . '/' . (defined('FM_FILE') ? FM_FILE : 'fm.php');
+    $current_db_file = '';
+    $current_fm_file = '';
+    
+    if (file_exists($db_file_path)) {
+        $old_db = file_get_contents($db_file_path);
+        if (preg_match("/define\('MASTER_PASS',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_db_pass = $m[1];
+        }
+        if (preg_match("/define\('DB_FILE',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_db_file = $m[1];
+        }
+        if (preg_match("/define\('FM_FILE',\s*'([^']*)'\)/", $old_db, $m)) {
+            $current_fm_file = $m[1];
+        }
+    }
+    
+    if (file_exists($fm_file_path)) {
+        $old_fm = file_get_contents($fm_file_path);
+        if (preg_match("/define\('MASTER_PASS',\s*'([^']*)'\)/", $old_fm, $m)) {
+            $current_fm_pass = $m[1];
+        }
+    }
+    
+    if ($current_db_pass !== '') {
+        $github_db = preg_replace("/define\('MASTER_PASS',\s*'[^']*'\)/", "define('MASTER_PASS', '{$current_db_pass}')", $github_db);
+    }
+    if ($current_fm_pass !== '') {
+        $github_fm = preg_replace("/define\('MASTER_PASS',\s*'[^']*'\)/", "define('MASTER_PASS', '{$current_fm_pass}')", $github_fm);
+    }
+    if ($current_db_file !== '') {
+        $github_db = preg_replace("/define\('DB_FILE',\s*'[^']*'\)/", "define('DB_FILE', '{$current_db_file}')", $github_db);
+        $github_fm = preg_replace("/define\('DB_FILE',\s*'[^']*'\)/", "define('DB_FILE', '{$current_db_file}')", $github_fm);
+    }
+    if ($current_fm_file !== '') {
+        $github_db = preg_replace("/define\('FM_FILE',\s*'[^']*'\)/", "define('FM_FILE', '{$current_fm_file}')", $github_db);
+        $github_fm = preg_replace("/define\('FM_FILE',\s*'[^']*'\)/", "define('FM_FILE', '{$current_fm_file}')", $github_fm);
+    }
+    
+    if (file_put_contents($db_file_path, $github_db) === false) {
+        return "Failed to write to {$db_file_path}. Check permissions.";
+    }
+    if (file_put_contents($fm_file_path, $github_fm) === false) {
+        return "Failed to write to {$fm_file_path}. Check permissions.";
+    }
+    
+    if (is_dir(__DIR__ . '/../.git')) {
+        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
+        if (trim($git_check) === 'true') {
+            @shell_exec('git reset --hard origin/main 2>&1');
+        }
+    }
+    
+    return true;
+}
+
+// MCP API endpoint
+if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
+    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
+    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+        header('Content-Type: application/json', true, 401);
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $input = file_get_contents('php://input');
+    $request = json_decode($input, true);
+    if (!$request) {
+        $request = $_POST;
+    }
+    
+    $method = $request['method'] ?? '';
+    $params = $request['params'] ?? [];
+    $id = $request['id'] ?? null;
+    
+    header('Content-Type: application/json');
+    
+    if ($method === 'tools/list') {
+        echo json_encode([
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'result' => [
+                'tools' => [
+                    [
+                        'name' => 'list_directory',
+                        'description' => 'List contents of a directory',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'path' => ['type' => 'string', 'description' => 'Directory path (relative or absolute)']
+                            ],
+                            'required' => ['path']
+                        ]
+                    ],
+                    [
+                        'name' => 'read_file',
+                        'description' => 'Read content of a file',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'path' => ['type' => 'string', 'description' => 'File path']
+                            ],
+                            'required' => ['path']
+                        ]
+                    ],
+                    [
+                        'name' => 'write_file',
+                        'description' => 'Write or create content of a file',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'path' => ['type' => 'string', 'description' => 'File path'],
+                                'content' => ['type' => 'string', 'description' => 'File content']
+                            ],
+                            'required' => ['path', 'content']
+                        ]
+                    ],
+                    [
+                        'name' => 'delete_file',
+                        'description' => 'Delete a file or directory',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'path' => ['type' => 'string', 'description' => 'File or directory path']
+                            ],
+                            'required' => ['path']
+                        ]
+                    ]
+                ]
+            ]
+        ]);
+        exit;
+    }
+    
+    if ($method === 'tools/call') {
+        $tool = $params['name'] ?? '';
+        $arguments = $params['arguments'] ?? [];
+        $result = ['content' => [], 'isError' => false];
+        
+        $path = $arguments['path'] ?? '';
+        $base_dir = (DIRECTORY_SEPARATOR === '\\') ? substr(realpath(__DIR__), 0, 3) : '/';
+        $v = validate_path($base_dir, $path);
+        
+        if (!$v['valid']) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: Invalid path or directory traversal detected."];
+        } else {
+            $resolved_path = $v['path'];
+            
+            if ($tool === 'list_directory') {
+                if (!has_mcp_permission('folders', $resolved_path, 'read')) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder '{$resolved_path}'."];
+                } else {
+                    if (!is_dir($resolved_path)) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a directory."];
+                    } else {
+                        $files = scandir($resolved_path);
+                        $info = [];
+                        foreach ($files as $f) {
+                            if ($f === '.' || $f === '..') continue;
+                            $fpath = $resolved_path . '/' . $f;
+                            $info[] = [
+                                'name' => $f,
+                                'type' => is_dir($fpath) ? 'directory' : 'file',
+                                'size' => is_dir($fpath) ? 0 : filesize($fpath),
+                                'modified' => date('Y-m-d H:i:s', filemtime($fpath))
+                            ];
+                        }
+                        $result['content'][] = ['type' => 'text', 'text' => json_encode($info, JSON_PRETTY_PRINT)];
+                    }
+                }
+            } elseif ($tool === 'read_file') {
+                if (!has_mcp_permission('folders', $resolved_path, 'read')) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder containing this file."];
+                } else {
+                    if (!is_file($resolved_path)) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a file."];
+                    } else {
+                        $content = file_get_contents($resolved_path);
+                        $result['content'][] = ['type' => 'text', 'text' => $content];
+                    }
+                }
+            } elseif ($tool === 'write_file') {
+                if (!has_mcp_permission('folders', $resolved_path, 'write')) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file."];
+                } else {
+                    $content = $arguments['content'] ?? '';
+                    if (file_put_contents($resolved_path, $content) === false) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to write to file."];
+                    } else {
+                        $result['content'][] = ['type' => 'text', 'text' => "Success: File written successfully."];
+                    }
+                }
+            } elseif ($tool === 'delete_file') {
+                if (!has_mcp_permission('folders', $resolved_path, 'write')) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file/directory."];
+                } else {
+                    if (is_dir($resolved_path)) {
+                        $ok = @rmdir($resolved_path);
+                    } else {
+                        $ok = @unlink($resolved_path);
+                    }
+                    if (!$ok) {
+                        $result['isError'] = true;
+                        $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to delete path."];
+                    } else {
+                        $result['content'][] = ['type' => 'text', 'text' => "Success: Path deleted successfully."];
+                    }
+                }
+            } else {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
+            }
+        }
+        echo json_encode(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result]);
+        exit;
+    }
+}
+
+// Handle Update Checking & Config API
+if (isset($_SESSION['fm_authenticated']) || is_api_request()) {
+    if (isset($_GET['action']) && $_GET['action'] === 'check_updates') {
+        header('Content-Type: application/json');
+        echo json_encode(check_for_updates());
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'apply_update') {
+        validate_csrf_token();
+        header('Content-Type: application/json');
+        $res = apply_update();
+        if ($res === true) {
+            echo json_encode(['success' => true]);
+        } else {
+            header('Content-Type: application/json', true, 500);
+            echo json_encode(['error' => $res]);
+        }
+        exit;
+    }
+    if (isset($_GET['action']) && $_GET['action'] === 'get_mcp_config') {
+        header('Content-Type: application/json');
+        echo json_encode(load_mcp_config());
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
+        validate_csrf_token();
+        $input = json_decode($_POST['config'] ?? '{}', true);
+        save_mcp_config($input);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true]);
+        exit;
+    }
+}
+
 // Handle Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     unset($_SESSION['fm_authenticated']);
@@ -273,36 +621,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Handle Login
-$login_error = null;
-if (isset($_POST['action']) && $_POST['action'] === 'login') {
-    // SECURITY: Rate limiting on login attempts
-    $rate_check = check_rate_limit('login', 5, 900);
-
-    if (!$rate_check['allowed']) {
-        $minutes = ceil($rate_check['wait'] / 60);
-        $login_error = "Too many failed attempts. Please try again in {$minutes} minute(s).";
-    } else {
-        $pass = $_POST['password'] ?? '';
-
-        if (!empty(MASTER_PASS) && verify_master_password($pass)) {
-            init_session_after_login();
-            header("Location: fm.php");
-            exit;
-        } else {
-            record_failed_login();
-            $login_error = "Invalid Master Password.";
-        }
-    }
-}
-
-
-// SECURITY: Check session timeout for web UI
-if (!isset($_GET['ajax']) && !isset($_POST['action'])) {
-    if (!empty($_SESSION['fm_authenticated']) && !check_session_timeout()) {
-        header("Location: fm.php");
-        exit;
-    }
+// Auth handled at app level (fingerprint). Auto-authenticate for all access.
+if (!isset($_SESSION['fm_authenticated'])) {
+    init_session_after_login();
 }
 
 // Show HTML UI (Login or Dashboard)
@@ -744,6 +1065,10 @@ window.switchApp = function(url) {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><rect x="7" y="7" width="3" height="3"></rect><rect x="14" y="7" width="3" height="3"></rect><rect x="7" y="14" width="3" height="3"></rect><rect x="14" y="14" width="3" height="3"></rect></svg>
                         CONNECT MOBILE APP
                     </button>
+                    <button @click="openMcpModal" class="btn btn-ghost" style="width: 100%; font-size: 0.75rem; padding: 0.6rem; border: 1px solid rgba(255,255,255,0.1); color: var(--accent); margin-top: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        MCP & AUTO-UPDATE
+                    </button>
                 </div>
 
             <div class="sidebar-section">
@@ -1154,6 +1479,11 @@ window.switchApp = function(url) {
                 showRemoteUpload: false,
                 remoteUrl: '',
                 selectedItems: [],
+                showMcpModal: false,
+                mcpConfig: { databases: {}, folders: {} },
+                newMcpFolder: '',
+                newMcpDatabase: '',
+                updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
 
 
                 get pathSegments() {
@@ -1356,6 +1686,106 @@ window.switchApp = function(url) {
                     }
                 },
 
+
+                async openMcpModal() {
+                    this.showMcpModal = true;
+                    this.loading = true;
+                    try {
+                        const res = await fetch('?action=get_mcp_config');
+                        this.mcpConfig = await res.json();
+                        if (!this.mcpConfig.databases) this.mcpConfig.databases = {};
+                        if (!this.mcpConfig.folders) this.mcpConfig.folders = {};
+                    } catch(e) {
+                        console.error('Failed to load MCP config:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                addMcpFolder() {
+                    if (!this.newMcpFolder) return;
+                    if (!this.mcpConfig.folders[this.newMcpFolder]) {
+                        this.mcpConfig.folders[this.newMcpFolder] = { read: true, write: false };
+                    }
+                    this.newMcpFolder = '';
+                },
+                addCurrentFolderToMcp() {
+                    const currentFolder = this.currentPath;
+                    if (!this.mcpConfig.folders[currentFolder]) {
+                        this.mcpConfig.folders[currentFolder] = { read: true, write: false };
+                    }
+                },
+                removeMcpFolder(folder) {
+                    delete this.mcpConfig.folders[folder];
+                },
+                addMcpDatabase() {
+                    if (!this.newMcpDatabase) return;
+                    if (!this.mcpConfig.databases[this.newMcpDatabase]) {
+                        this.mcpConfig.databases[this.newMcpDatabase] = { read: true, write: false };
+                    }
+                    this.newMcpDatabase = '';
+                },
+                removeMcpDatabase(db) {
+                    delete this.mcpConfig.databases[db];
+                },
+                async saveMcpConfig() {
+                    this.loading = true;
+                    const fd = new FormData();
+                    fd.append('action', 'save_mcp_config');
+                    fd.append('config', JSON.stringify(this.mcpConfig));
+                    fd.append('csrf_token', this.csrf_token);
+                    try {
+                        const res = await fetch('', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.success) {
+                            window.uiAlert('MCP Configuration saved successfully!');
+                        } else {
+                            window.uiAlert('Error: ' + data.error);
+                        }
+                    } catch(e) {
+                        window.uiAlert('Failed to save configuration.');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async checkUpdates() {
+                    this.updateInfo.loading = true;
+                    this.updateInfo.error = '';
+                    try {
+                        const res = await fetch('?action=check_updates');
+                        const data = await res.json();
+                        this.updateInfo.checked = true;
+                        this.updateInfo.available = data.update_available;
+                        this.updateInfo.current = data.current_version;
+                        this.updateInfo.latest = data.latest_version;
+                        this.updateInfo.commitsBehind = data.commits_behind;
+                    } catch(e) {
+                        this.updateInfo.error = 'Failed to check for updates.';
+                    } finally {
+                        this.updateInfo.loading = false;
+                    }
+                },
+                async triggerUpdate() {
+                    const conf = await window.uiConfirm('Are you sure you want to update SQLuxe & FileLuxe now? This will overwrite db.php and fm.php.');
+                    if (!conf) return;
+                    this.updateInfo.loading = true;
+                    const fd = new FormData();
+                    fd.append('action', 'apply_update');
+                    fd.append('csrf_token', this.csrf_token);
+                    try {
+                        const res = await fetch('', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.success) {
+                            window.uiAlert('Updates applied successfully! The page will now reload.');
+                            location.reload();
+                        } else {
+                            window.uiAlert('Update failed: ' + data.error);
+                        }
+                    } catch(e) {
+                        window.uiAlert('Failed to apply update.');
+                    } finally {
+                        this.updateInfo.loading = false;
+                    }
+                },
 
                 async fetchFiles(path = '/') {
                     let res = await this.apiReq({ ajax: 'files', path: path }, 'GET');
@@ -1645,6 +2075,175 @@ window.switchApp = function(url) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 Delete
             </button>
+        </div>
+    </div>
+
+    <!-- MCP & Auto-Update Modal -->
+    <div class="modal-overlay" x-show="showMcpModal" x-cloak x-transition>
+        <div class="modal-card" style="max-width: 700px; width: 95%; height: 80vh;" @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
+            <div class="modal-header">
+                <div class="flex items-center gap-2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    <h3 style="font-weight: 700;">MCP & Auto-Update Panel</h3>
+                </div>
+                <button @click="showMcpModal = false" class="btn btn-ghost" style="padding: 0.25rem; border: none;">&times;</button>
+            </div>
+            
+            <div style="padding: 0 1.5rem; border-bottom: 1px solid var(--border);">
+                <div class="tabs" style="margin-bottom: 0;">
+                    <div class="tab" :class="subTab === 'mcp' ? 'active' : ''" @click="subTab = 'mcp'">AI & MCP Permissions</div>
+                    <div class="tab" :class="subTab === 'update' ? 'active' : ''" @click="subTab = 'update'">System Auto-Update</div>
+                </div>
+            </div>
+
+            <div class="modal-body" style="overflow-y: auto; flex: 1;">
+                
+                <!-- MCP Tab -->
+                <div x-show="subTab === 'mcp'" class="flex flex-col gap-4">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Grant specific read/write access to AI clients connecting via Model Context Protocol (MCP).
+                    </p>
+                    
+                    <!-- Databases Permissions -->
+                    <div>
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Database Access Rules</h4>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.5rem;">
+                            <div class="flex gap-2" style="margin-bottom: 1rem;">
+                                <input type="text" x-model="newMcpDatabase" class="input-control" placeholder="Database Name" style="font-size: 0.8rem; padding: 0.5rem;">
+                                <button @click="addMcpDatabase" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Add Database</button>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1);">
+                                            <th style="text-align: left; padding: 0.5rem 1rem;">Database</th>
+                                            <th style="text-align: center; padding: 0.5rem; width: 80px;">Read</th>
+                                            <th style="text-align: center; padding: 0.5rem; width: 80px;">Write</th>
+                                            <th style="text-align: center; padding: 0.5rem; width: 40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(perms, dbName) in mcpConfig.databases" :key="dbName">
+                                            <tr style="border-bottom: 1px solid var(--border);">
+                                                <td style="padding: 0.5rem 1rem; font-weight: 600;" x-text="dbName"></td>
+                                                <td style="text-align: center; padding: 0.5rem;">
+                                                    <input type="checkbox" x-model="perms.read">
+                                                </td>
+                                                <td style="text-align: center; padding: 0.5rem;">
+                                                    <input type="checkbox" x-model="perms.write">
+                                                </td>
+                                                <td style="text-align: center; padding: 0.5rem;">
+                                                    <button @click="removeMcpDatabase(dbName)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;">&times;</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <template x-if="Object.keys(mcpConfig.databases || {}).length === 0">
+                                            <tr>
+                                                <td colspan="4" style="color: var(--text-secondary); font-size: 0.75rem; text-align: center; padding: 1rem; opacity: 0.6;">No databases configured.</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Folders Permissions -->
+                    <div>
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Folder Access Rules</h4>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.5rem;">
+                            <div class="flex gap-2" style="margin-bottom: 1rem;">
+                                <input type="text" x-model="newMcpFolder" class="input-control" placeholder="Absolute folder path (e.g. /var/www)" style="font-size: 0.8rem; padding: 0.5rem;">
+                                <button @click="addMcpFolder" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Add Path</button>
+                                <button @click="addCurrentFolderToMcp" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem; color: var(--accent);">+ Add Current</button>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <template x-for="(perms, path) in mcpConfig.folders" :key="path">
+                                    <div class="flex items-center justify-between" style="padding: 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md);">
+                                        <span style="font-size: 0.75rem; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;" x-text="path"></span>
+                                        <div class="flex items-center gap-4">
+                                            <label class="flex items-center gap-1" style="font-size: 0.75rem;">
+                                                <input type="checkbox" x-model="perms.read"> R
+                                            </label>
+                                            <label class="flex items-center gap-1" style="font-size: 0.75rem;">
+                                                <input type="checkbox" x-model="perms.write"> W
+                                            </label>
+                                            <button @click="removeMcpFolder(path)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;">&times;</button>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="Object.keys(mcpConfig.folders || {}).length === 0">
+                                    <span style="color: var(--text-secondary); font-size: 0.75rem; text-align: center; display: block; opacity: 0.6;">No folders configured.</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Setup Instructions -->
+                    <div>
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                        <div style="background: #000; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.75rem; color: #fff; overflow-x: auto;">
+                            <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">{
+  "mcpServers": {
+    "serverluxe": {
+      "command": "node",
+      "args": [
+        "<?php echo str_replace('\\', '/', __DIR__ . '/mcp-bridge.js'); ?>",
+        "--url", "<?php 
+           $proto = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+           echo $proto . '://' . $_SERVER['HTTP_HOST'] . strtok($_SERVER['REQUEST_URI'], '?'); 
+        ?>",
+        "--key", "<?php echo htmlspecialchars(API_KEY); ?>"
+      ]
+    }
+  }
+}</pre>
+                        </div>
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                            Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server.
+                        </span>
+                    </div>
+
+                    <button @click="saveMcpConfig" class="btn btn-primary" style="margin-top: 1rem;">Save Permissions</button>
+                </div>
+
+                <!-- Updates Tab -->
+                <div x-show="subTab === 'update'" class="flex flex-col gap-4">
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; text-align: center;">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Current Version</div>
+                        <div style="font-size: 2.5rem; font-weight: 800; color: #fff; line-height: 1;" x-text="updateInfo.current"></div>
+                        
+                        <div style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem;">
+                            <button @click="checkUpdates" class="btn btn-ghost" :disabled="updateInfo.loading" style="padding: 0.5rem 1.5rem; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="updateInfo.loading ? 'animate-spin' : ''" style="margin-right: 0.25rem;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                Check for Updates
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Update Results -->
+                    <div x-show="updateInfo.checked" x-cloak style="background: rgba(34, 211, 238, 0.05); border: 1px solid rgba(34, 211, 238, 0.2); border-radius: var(--radius-md); padding: 1rem;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.9rem; color: var(--accent);" x-show="updateInfo.available">Update Available!</div>
+                                <div style="font-weight: 700; font-size: 0.9rem; color: var(--success);" x-show="!updateInfo.available">You are up to date!</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    Latest version on GitHub: <span style="font-weight: 700; color:#fff;" x-text="updateInfo.latest"></span>
+                                </div>
+                                <div x-show="updateInfo.commitsBehind > 0" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    Commits behind main: <span style="font-weight:700; color:#fff;" x-text="updateInfo.commitsBehind"></span>
+                                </div>
+                            </div>
+                            <button x-show="updateInfo.available" @click="triggerUpdate" class="btn btn-primary" :disabled="updateInfo.loading" style="padding: 0.5rem 1rem; font-size: 0.8rem; margin: 0; background: var(--danger); color: #fff;">
+                                Update Now
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div x-show="updateInfo.error" x-cloak style="color: var(--danger); font-size: 0.8rem; text-align: center;" x-text="updateInfo.error"></div>
+                </div>
+
+            </div>
         </div>
     </div>
 
