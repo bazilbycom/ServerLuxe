@@ -290,11 +290,11 @@ function check_for_updates() {
     $opts = [
         'http' => [
             'method' => 'GET',
-            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+            'header' => "User-Agent: ServerLuxe-Updater\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n"
         ]
     ];
     $context = stream_context_create($opts);
-    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time(), false, $context);
     
     if ($github_db) {
         if (preg_match("/define\('VERSION',\s*'([^']+)'\)/", $github_db, $matches)) {
@@ -324,13 +324,13 @@ function apply_update() {
     $opts = [
         'http' => [
             'method' => 'GET',
-            'header' => "User-Agent: ServerLuxe-Updater\r\n"
+            'header' => "User-Agent: ServerLuxe-Updater\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n"
         ]
     ];
     $context = stream_context_create($opts);
     
-    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php", false, $context);
-    $github_fm = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php", false, $context);
+    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time(), false, $context);
+    $github_fm = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php?t=" . time(), false, $context);
     
     if (!$github_db || !$github_fm) {
         return "Failed to download update files from GitHub.";
