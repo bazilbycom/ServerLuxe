@@ -1974,7 +1974,7 @@ if ($isConnected) {
                                     <template x-for="(row, index) in tableData.rows">
                                         <tr @click="editRow(row)" class="clickable-row" :style="selectedRows.includes(row) ? 'background: rgba(34, 211, 238, 0.05);' : ''">
                                             <td style="text-align: center;" @click.stop>
-                                                <input type="checkbox" :value="row" x-model="selectedRows" style="accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer;">
+                                                <input type="checkbox" :checked="selectedRows.includes(row)" @change="if ($event.target.checked) { if (!selectedRows.includes(row)) selectedRows.push(row); } else { selectedRows = selectedRows.filter(r => r !== row); }" style="accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer;">
                                             </td>
                                             <td style="text-align: center; color: var(--text-secondary); border-right: 1px solid var(--border); font-size: 0.75rem;" x-text="index + 1"></td>
                                             <template x-for="col in tableData.columns">
