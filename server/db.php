@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.2.4');
+define('VERSION', '12.4');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -2319,49 +2319,19 @@ if ($isConnected) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <template x-for="(perms, dbName) in mcpConfig.databases" :key="dbName">
+                                            <template x-for="dbName in allDatabases" :key="dbName">
                                                 <tr style="border-bottom: 1px solid var(--border);">
                                                     <td style="padding: 0.5rem 1rem; font-weight: 600;" x-text="dbName"></td>
                                                     <td style="text-align: center; padding: 0.5rem;">
-                                                        <input type="checkbox" x-model="perms.read">
+                                                        <input type="checkbox" x-model="mcpConfig.databases[dbName].read">
                                                     </td>
                                                     <td style="text-align: center; padding: 0.5rem;">
-                                                        <input type="checkbox" x-model="perms.write">
+                                                        <input type="checkbox" x-model="mcpConfig.databases[dbName].write">
                                                     </td>
                                                 </tr>
                                             </template>
                                         </tbody>
                                     </table>
-                                </div>
-                            </div>
-
-                            <!-- Folders Permissions -->
-                            <div>
-                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Folder Access Rules</h4>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.5rem;">
-                                    <div class="flex gap-2" style="margin-bottom: 1rem;">
-                                        <input type="text" x-model="newMcpFolder" class="input-control" placeholder="Absolute folder path (e.g. /var/www)" style="font-size: 0.8rem; padding: 0.5rem;">
-                                        <button @click="addMcpFolder" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Add Path</button>
-                                    </div>
-                                    <div class="flex flex-col gap-2">
-                                        <template x-for="(perms, path) in mcpConfig.folders" :key="path">
-                                            <div class="flex items-center justify-between" style="padding: 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md);">
-                                                <span style="font-size: 0.75rem; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;" x-text="path"></span>
-                                                <div class="flex items-center gap-4">
-                                                    <label class="flex items-center gap-1" style="font-size: 0.75rem;">
-                                                        <input type="checkbox" x-model="perms.read"> R
-                                                    </label>
-                                                    <label class="flex items-center gap-1" style="font-size: 0.75rem;">
-                                                        <input type="checkbox" x-model="perms.write"> W
-                                                    </label>
-                                                    <button @click="removeMcpFolder(path)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;">&times;</button>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="Object.keys(mcpConfig.folders || {}).length === 0">
-                                            <span style="color: var(--text-secondary); font-size: 0.75rem; text-align: center; display: block; opacity: 0.6;">No folders configured.</span>
-                                        </template>
-                                    </div>
                                 </div>
                             </div>
 
@@ -2578,7 +2548,6 @@ if ($isConnected) {
                 showMcpModal: false,
                 allDatabases: <?php echo json_encode($databases); ?>,
                 mcpConfig: { databases: {}, folders: {} },
-                newMcpFolder: '',
                 updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
                 isReadOnly: <?php echo !empty($_SESSION['read_only']) ? 'true' : 'false'; ?>,
                 csrfToken: '<?php echo $_SESSION['csrf_token']; ?>',
@@ -2775,16 +2744,7 @@ if ($isConnected) {
                         this.loading = false;
                     }
                 },
-                addMcpFolder() {
-                    if (!this.newMcpFolder) return;
-                    if (!this.mcpConfig.folders[this.newMcpFolder]) {
-                        this.mcpConfig.folders[this.newMcpFolder] = { read: true, write: false };
-                    }
-                    this.newMcpFolder = '';
-                },
-                removeMcpFolder(folder) {
-                    delete this.mcpConfig.folders[folder];
-                },
+
                 async saveMcpConfig() {
                     this.loading = true;
                     const fd = new FormData();

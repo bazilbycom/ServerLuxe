@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.2.4');
+define('VERSION', '12.4');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -1482,7 +1482,6 @@ window.switchApp = function(url) {
                 showMcpModal: false,
                 mcpConfig: { databases: {}, folders: {} },
                 newMcpFolder: '',
-                newMcpDatabase: '',
                 updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
 
 
@@ -1717,16 +1716,7 @@ window.switchApp = function(url) {
                 removeMcpFolder(folder) {
                     delete this.mcpConfig.folders[folder];
                 },
-                addMcpDatabase() {
-                    if (!this.newMcpDatabase) return;
-                    if (!this.mcpConfig.databases[this.newMcpDatabase]) {
-                        this.mcpConfig.databases[this.newMcpDatabase] = { read: true, write: false };
-                    }
-                    this.newMcpDatabase = '';
-                },
-                removeMcpDatabase(db) {
-                    delete this.mcpConfig.databases[db];
-                },
+
                 async saveMcpConfig() {
                     this.loading = true;
                     const fd = new FormData();
@@ -2104,49 +2094,7 @@ window.switchApp = function(url) {
                         Grant specific read/write access to AI clients connecting via Model Context Protocol (MCP).
                     </p>
                     
-                    <!-- Databases Permissions -->
-                    <div>
-                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Database Access Rules</h4>
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.5rem;">
-                            <div class="flex gap-2" style="margin-bottom: 1rem;">
-                                <input type="text" x-model="newMcpDatabase" class="input-control" placeholder="Database Name" style="font-size: 0.8rem; padding: 0.5rem;">
-                                <button @click="addMcpDatabase" class="btn btn-ghost" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Add Database</button>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                                    <thead>
-                                        <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1);">
-                                            <th style="text-align: left; padding: 0.5rem 1rem;">Database</th>
-                                            <th style="text-align: center; padding: 0.5rem; width: 80px;">Read</th>
-                                            <th style="text-align: center; padding: 0.5rem; width: 80px;">Write</th>
-                                            <th style="text-align: center; padding: 0.5rem; width: 40px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template x-for="(perms, dbName) in mcpConfig.databases" :key="dbName">
-                                            <tr style="border-bottom: 1px solid var(--border);">
-                                                <td style="padding: 0.5rem 1rem; font-weight: 600;" x-text="dbName"></td>
-                                                <td style="text-align: center; padding: 0.5rem;">
-                                                    <input type="checkbox" x-model="perms.read">
-                                                </td>
-                                                <td style="text-align: center; padding: 0.5rem;">
-                                                    <input type="checkbox" x-model="perms.write">
-                                                </td>
-                                                <td style="text-align: center; padding: 0.5rem;">
-                                                    <button @click="removeMcpDatabase(dbName)" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem;">&times;</button>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                        <template x-if="Object.keys(mcpConfig.databases || {}).length === 0">
-                                            <tr>
-                                                <td colspan="4" style="color: var(--text-secondary); font-size: 0.75rem; text-align: center; padding: 1rem; opacity: 0.6;">No databases configured.</td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+
 
                     <!-- Folders Permissions -->
                     <div>

@@ -73,7 +73,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed)
         $env_content = "# ServerLuxe Configuration\n";
         $env_content .= "APP_NAME=ServerLuxe\n";
         $env_content .= "APP_ENV=production\n";
-        $env_content .= "VERSION=1.2.4\n\n";
+        $env_content .= "VERSION=12.4\n\n";
         
         $env_content .= "# Database Connection Defaults\n";
         $env_content .= "DEFAULT_HOST={$host}\n";
