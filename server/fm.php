@@ -1703,18 +1703,26 @@ window.switchApp = function(url) {
                 addMcpFolder() {
                     if (!this.newMcpFolder) return;
                     if (!this.mcpConfig.folders[this.newMcpFolder]) {
-                        this.mcpConfig.folders[this.newMcpFolder] = { read: true, write: false };
+                        this.mcpConfig.folders = {
+                            ...this.mcpConfig.folders,
+                            [this.newMcpFolder]: { read: true, write: false }
+                        };
                     }
                     this.newMcpFolder = '';
                 },
                 addCurrentFolderToMcp() {
                     const currentFolder = this.currentPath;
                     if (!this.mcpConfig.folders[currentFolder]) {
-                        this.mcpConfig.folders[currentFolder] = { read: true, write: false };
+                        this.mcpConfig.folders = {
+                            ...this.mcpConfig.folders,
+                            [currentFolder]: { read: true, write: false }
+                        };
                     }
                 },
                 removeMcpFolder(folder) {
-                    delete this.mcpConfig.folders[folder];
+                    const next = { ...this.mcpConfig.folders };
+                    delete next[folder];
+                    this.mcpConfig.folders = next;
                 },
 
                 async saveMcpConfig() {
