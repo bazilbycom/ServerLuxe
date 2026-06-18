@@ -4,7 +4,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 <div align="center">
 
-![ServerLuxe Badge](https://img.shields.io/badge/version-1.2.7-cyan?style=flat-square)
+![ServerLuxe Badge](https://img.shields.io/badge/version-1.2.8-cyan?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen?style=flat-square)
 
@@ -174,7 +174,7 @@ curl -X POST https://example.com/admin/fm.php \
    # ServerLuxe Configuration
    APP_NAME=ServerLuxe
    APP_ENV=production
-   VERSION=1.2.7
+   VERSION=1.2.8
 
    # Database Connection Defaults
    DEFAULT_HOST=127.0.0.1

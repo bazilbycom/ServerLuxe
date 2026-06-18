@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.2.7');
+define('VERSION', '1.2.8');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -243,6 +243,12 @@ function is_api_request() {
 
 function load_mcp_config() {
     $config_file = __DIR__ . '/mcp_config.json';
+    if (!file_exists($config_file)) {
+        @file_put_contents($config_file, json_encode(['databases' => [], 'folders' => []], JSON_PRETTY_PRINT));
+        @chmod($config_file, 0666);
+    } else {
+        @chmod($config_file, 0666);
+    }
     if (file_exists($config_file)) {
         return json_decode(file_get_contents($config_file), true) ?: ['databases' => [], 'folders' => []];
     }
@@ -251,7 +257,14 @@ function load_mcp_config() {
 
 function save_mcp_config($config) {
     $config_file = __DIR__ . '/mcp_config.json';
-    return file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+    if (file_exists($config_file)) {
+        @chmod($config_file, 0666);
+    }
+    $res = file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+    if ($res !== false) {
+        @chmod($config_file, 0666);
+    }
+    return $res;
 }
 
 function has_mcp_permission($type, $name, $access_type) {
@@ -606,9 +619,14 @@ if (isset($_SESSION['fm_authenticated']) || is_api_request()) {
     if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
         validate_csrf_token();
         $input = json_decode($_POST['config'] ?? '{}', true);
-        save_mcp_config($input);
+        $res = save_mcp_config($input);
         header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
+        if ($res === false) {
+            header('HTTP/1.1 500 Internal Server Error');
+            echo json_encode(['error' => 'Failed to write mcp_config.json. Check directory write permissions on the server.']);
+        } else {
+            echo json_encode(['success' => true]);
+        }
         exit;
     }
 }
