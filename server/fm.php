@@ -1167,7 +1167,7 @@ window.switchApp = function(url) {
                 </a>
 
                 <a href="https://bycomsolutions.com" target="_blank" class="flex items-center bycom-logo" style="padding-left: 0.5rem; border-left: 1px solid rgba(255,255,255,0.1); margin-left: 0.5rem;">
-                    <img src="https://bycomsolutions.com/_astro/logo.Bz8u1fa6_Z2e3zIX.webp" style="width: 80px; height: auto; opacity: 0.8; filter: grayscale(100%); transition: all 0.3s ease;" onmouseover="this.style.opacity=1; this.style.filter='grayscale(0%)'" onmouseout="this.style.opacity=0.8; this.style.filter='grayscale(100%)'">
+                    <img src="http://cdn.bycomsolutions.com/logo-dark.png" style="width: 80px; height: auto; opacity: 0.8; filter: grayscale(100%); transition: all 0.3s ease;" onmouseover="this.style.opacity=1; this.style.filter='grayscale(0%)'" onmouseout="this.style.opacity=0.8; this.style.filter='grayscale(100%)'">
                 </a>
             </div>
 
