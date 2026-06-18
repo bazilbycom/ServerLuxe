@@ -30,7 +30,7 @@ if ($is_installed) {
 // Test connection action (during installation or dashboard check)
 if (isset($_POST['action']) && $_POST['action'] === 'test_conn') {
     header('Content-Type: application/json');
-    $host = $_POST['host'] ?? '127.0.0.1';
+    $host = $_POST['host'] ?? 'localhost';
     $port = $_POST['port'] ?? '3306';
     $user = $_POST['user'] ?? '';
     $pass = $_POST['pass'] ?? '';
@@ -57,7 +57,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'test_conn') {
 if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed) {
     $master_pass = $_POST['master_pass'] ?? '';
     $api_key = $_POST['api_key'] ?? '';
-    $host = $_POST['host'] ?? '127.0.0.1';
+    $host = $_POST['host'] ?? 'localhost';
     $port = $_POST['port'] ?? '3306';
     $user = $_POST['user'] ?? '';
     $pass = $_POST['pass'] ?? '';
@@ -295,7 +295,7 @@ $suggested_api_key = bin2hex(random_bytes(16));
                     form: {
                         master_pass: '',
                         api_key: '<?php echo $suggested_api_key; ?>',
-                        host: '127.0.0.1',
+                        host: 'localhost',
                         port: '3306',
                         user: 'root',
                         pass: '',

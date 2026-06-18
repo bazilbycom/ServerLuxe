@@ -51,7 +51,7 @@ define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
 define('VERSION', $_ENV['VERSION'] ?? '1.2.1');
 
 // DEFAULTS
-define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? '127.0.0.1');
+define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
 define('DEFAULT_PORT', $_ENV['DEFAULT_PORT'] ?? '3306');
 define('DEFAULT_USER', $_ENV['DEFAULT_USER'] ?? 'root');
 define('DEFAULT_PASS', $_ENV['DEFAULT_PASS'] ?? '');
@@ -140,7 +140,7 @@ function get_db_connection() {
         if (empty($config['username']) && defined('DEFAULT_USER')) $config['username'] = DEFAULT_USER;
         if (empty($config['password']) && defined('DEFAULT_PASS')) $config['password'] = DEFAULT_PASS;
         if (empty($config['port'])) $config['port'] = '3306';
-        if (empty($config['host'])) $config['host'] = '127.0.0.1';
+        if (empty($config['host'])) $config['host'] = 'localhost';
 
         if (!empty($config['username'])) {
             error_log("[SQLuxe] Header Merge Success. Host: {$config['host']}, User: {$config['username']}, DB: " . ($config['database'] ?? 'None'));
@@ -1505,7 +1505,7 @@ if ($isConnected) {
 
     <?php if (!$isConnected): ?>
         <div class="login-overlay">
-            <div class="login-card" x-data="{ mode: 'master', form: { host: '127.0.0.1', username: '', port: '3306', password: '', database: '' } }">
+            <div class="login-card" x-data="{ mode: 'master', form: { host: 'localhost', username: '', port: '3306', password: '', database: '' } }">
                 <div class="flex items-center gap-2" style="margin-bottom: 2rem;">
                     <div class="logo-icon">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
@@ -2521,7 +2521,7 @@ if ($isConnected) {
                 mode: 'master',
                 saveBookmark: false,
                 bookmarks: JSON.parse(localStorage.getItem('sqluxe_bookmarks') || '[]'),
-                form: { host: '127.0.0.1', username: '', port: '3306', password: '', database: '' },
+                form: { host: 'localhost', username: '', port: '3306', password: '', database: '' },
 
                 saveToBookmarks() {
                     const exists = this.bookmarks.find(b => b.host === this.form.host && b.database === this.form.database);
