@@ -53,12 +53,39 @@ if (isset($_POST['action']) && $_POST['action'] === 'test_conn') {
     exit;
 }
 
+function download_installer_file($filename) {
+    $repo = 'bazilbycom/ServerLuxe';
+    $branch = 'main';
+    $url = "https://raw.githubusercontent.com/{$repo}/{$branch}/server/{$filename}";
+    
+    $opts = [
+        'http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: ServerLuxe-Installer\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n"
+        ]
+    ];
+    $context = stream_context_create($opts);
+    $content = @file_get_contents($url, false, $context);
+    if ($content === false) {
+        return false;
+    }
+    
+    $target_path = __DIR__ . '/' . $filename;
+    $write_res = @file_put_contents($target_path, $content);
+    if ($write_res === false) {
+        return false;
+    }
+    
+    @chmod($target_path, 0666);
+    return true;
+}
+
 // Perform Installation / Write .env
 if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed) {
     $master_pass = $_POST['master_pass'] ?? '';
     $api_key = $_POST['api_key'] ?? '';
-    $host = $_POST['host'] ?? 'localhost';
-    $port = $_POST['port'] ?? '3306';
+    $host = $_POST['host'] ?? '';
+    $port = $_POST['port'] ?? '';
     $user = $_POST['user'] ?? '';
     $pass = $_POST['pass'] ?? '';
     $db_name = $_POST['database'] ?? '';
@@ -90,8 +117,29 @@ if (isset($_POST['action']) && $_POST['action'] === 'install' && !$is_installed)
         $env_content .= "FM_FILE=fm.php\n";
 
         if (file_put_contents($env_file, $env_content) !== false) {
-            header("Location: index.php");
-            exit;
+            // Download rest of files
+            $files_to_download = ['db.php', 'fm.php', 'mcp-bridge.js'];
+            $download_errors = [];
+            
+            foreach ($files_to_download as $file) {
+                if (!download_installer_file($file)) {
+                    $download_errors[] = $file;
+                }
+            }
+            
+            if (!empty($download_errors)) {
+                $error = "Failed to download required application files from GitHub (" . implode(', ', $download_errors) . "). Please check internet connection and directory write permissions.";
+                @unlink($env_file);
+                // Clean up any partially downloaded files
+                foreach ($files_to_download as $file) {
+                    if (file_exists(__DIR__ . '/' . $file)) {
+                        @unlink(__DIR__ . '/' . $file);
+                    }
+                }
+            } else {
+                header("Location: index.php");
+                exit;
+            }
         } else {
             $error = "Failed to write .env file. Please check folder write permissions.";
         }
@@ -334,6 +382,12 @@ $suggested_api_key = bin2hex(random_bytes(16));
                         }
                     }
                 }">
+                    <?php if (!is_writable(__DIR__)): ?>
+                        <div class="alert" style="background: rgba(245, 158, 11, 0.1); border-color: var(--danger); color: #f87171;">
+                            <strong>⚠️ Warning:</strong> The directory <code><?php echo htmlspecialchars(__DIR__); ?></code> is not writable by PHP. The installer will not be able to write the <code>.env</code> file or download the rest of the application files. Please grant write permissions (e.g. <code>chmod 775</code>) before proceeding.
+                        </div>
+                    <?php endif; ?>
+
                     <?php if (isset($error)): ?>
                         <div class="alert"><?php echo htmlspecialchars($error); ?></div>
                     <?php endif; ?>
@@ -357,7 +411,8 @@ $suggested_api_key = bin2hex(random_bytes(16));
                                 <span style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; display: block;">Used for AI Model Context Protocol (MCP) clients and mobile app synchronization.</span>
                             </div>
 
-                            <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; gap: 1rem;">
+                                <button type="submit" class="btn btn-ghost" :disabled="!form.master_pass || !form.api_key">Skip DB Config & Install</button>
                                 <button type="button" @click="step = 2" class="btn btn-primary" :disabled="!form.master_pass || !form.api_key">Continue to DB Config</button>
                             </div>
                         </div>

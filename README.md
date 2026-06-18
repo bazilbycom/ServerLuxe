@@ -165,51 +165,33 @@ For step-by-step setup instructions, see the [MCP Integration Guide](file:///ser
 
 ### Installation (Web UI)
 
-1. **Download the files**
+ServerLuxe supports a **one-file automated remote installation**:
+
+1. **Download `index.php`** directly onto your web server in your desired directory (e.g., `admin/`):
    ```bash
-   git clone https://github.com/yourusername/mysqlweb.git
-   cd mysqlweb/server
+   # Using curl:
+   curl -o index.php https://raw.githubusercontent.com/bazilbycom/ServerLuxe/main/server/index.php
+   
+   # Or using wget:
+   wget https://raw.githubusercontent.com/bazilbycom/ServerLuxe/main/server/index.php
    ```
 
-2. **Upload to your server**
-   ```bash
-   scp db.php fm.php user@example.com:/var/www/html/admin/
-   ```
+2. **Access in your browser**:
+   Navigate to the URL where you placed the file (e.g., `https://yourdomain.com/admin/index.php`).
 
-3. **Configure Environment**
-   - **⚠️ IMPORTANT**: Copy `.env.example` to `.env` and **fill in the real values**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your actual database credentials and secure passwords
-   ```
-
-   Example `.env` file:
-   ```ini
-   # ServerLuxe Configuration
-   APP_NAME=ServerLuxe
-   APP_ENV=production
-   VERSION=1.2.9
-
-   # Database Connection Defaults
-   DEFAULT_HOST=127.0.0.1
-   DEFAULT_PORT=3306
-   DEFAULT_USER=root
-   DEFAULT_PASS=password
-
-   # Security
-   MASTER_PASS=Bycom@22945        # Master password (auto-hashed)
-   API_KEY=2026                    # API authentication key
-
-   # Navigation
-   DB_FILE=db.php
-   FM_FILE=fm.php
-   ```
-
-   **Security Note**: Never commit `.env` to version control. Always use `.env.example` as a template and fill in your actual credentials locally.
-
-4. **Access in browser**
-   - Database Manager: `https://yourdomain.com/admin/db.php`
-   - File Manager: `https://yourdomain.com/admin/fm.php`
+3. **Complete the Setup Wizard**:
+   * **Step 1 (Security)**: Set a secure **Master Password** to protect your panels and an **API Access Key** for AI MCP client and mobile app connections.
+   * **Step 2 (Database Defaults - Optional)**: Enter default MySQL connection details if you want SQLuxe to connect automatically. You can click **Skip DB Config & Install** to skip database setup.
+   
+   Once submitted, the installer will automatically:
+   * Write your secure `.env` configuration file.
+   * Download the latest versions of `db.php`, `fm.php`, and `mcp-bridge.js` directly from the official GitHub repository.
+   * Configure permissions automatically.
+   
+4. **All Set!**
+   * Central Dashboard: `https://yourdomain.com/admin/index.php`
+   * Database Manager: `https://yourdomain.com/admin/db.php`
+   * File Manager: `https://yourdomain.com/admin/fm.php`
 
 5. **Login**
    - Password: Use `MASTER_PASS` from `.env` (or default configuration)
