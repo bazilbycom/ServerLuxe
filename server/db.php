@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', $_ENV['VERSION'] ?? '1.2.2');
+define('VERSION', $_ENV['VERSION'] ?? '1.2.3');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
