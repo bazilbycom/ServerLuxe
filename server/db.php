@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.2.8');
+define('VERSION', '1.2.9');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -596,7 +596,10 @@ if (isset($_SESSION['db_config']) || is_api_request()) {
     }
     if (isset($_GET['action']) && $_GET['action'] === 'get_mcp_config') {
         header('Content-Type: application/json');
-        echo json_encode(load_mcp_config());
+        $config = load_mcp_config();
+        if (empty($config['databases'])) $config['databases'] = (object)[];
+        if (empty($config['folders'])) $config['folders'] = (object)[];
+        echo json_encode($config);
         exit;
     }
     if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
@@ -2752,8 +2755,8 @@ if ($isConnected) {
                     try {
                         const res = await fetch('?action=get_mcp_config');
                         this.mcpConfig = await res.json();
-                        if (!this.mcpConfig.databases) this.mcpConfig.databases = {};
-                        if (!this.mcpConfig.folders) this.mcpConfig.folders = {};
+                        if (!this.mcpConfig.databases || Array.isArray(this.mcpConfig.databases)) this.mcpConfig.databases = {};
+                        if (!this.mcpConfig.folders || Array.isArray(this.mcpConfig.folders)) this.mcpConfig.folders = {};
                         
                         this.allDatabases.forEach(db => {
                             if (!this.mcpConfig.databases[db]) {
