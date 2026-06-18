@@ -19,6 +19,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 - **Zero Dependencies** - Single PHP files, no complex framework dependencies. Just drop and run.
 - **Beautiful UI/UX** - Glassmorphism design, dark mode optimized, smooth animations, mobile-first responsive layout
 - **RESTful API** - Native API endpoints for headless management, custom integrations, and mobile app connections
+- **Model Context Protocol (MCP)** - Securely connect AI agents (like Claude Desktop and Cursor) directly to your server databases and files
 - **Secure by Default** - Password hashing (bcrypt), API key authentication, CSRF protection, session management, path traversal prevention
 - **Cross-Platform Ready** - Works on desktop browsers AND native Android/iOS apps via Capacitor
 - **Real-time Operations** - Fast file browsing, instant database queries, live status monitoring
@@ -138,6 +139,19 @@ curl -X POST https://example.com/admin/fm.php \
   -H "X-API-KEY: 2026" \
   -d "action=read&file=config.php"
 ```
+
+---
+
+## 🤖 AI & Model Context Protocol (MCP)
+
+ServerLuxe supports the **Model Context Protocol (MCP)**, allowing AI assistants (like Claude, Cursor, and other agents) to securely read, describe, query, and edit databases and files directly on your remote server.
+
+### Key Features:
+*   **Secure Stdio-to-HTTPS Bridge**: Standard JSON-RPC stdio is bridged securely to remote HTTPS endpoints via a local `mcp-bridge.js` proxy using your API key.
+*   **Granular Access Control**: Restrict AI agents to specific databases (`db.php`) or directory paths (`fm.php`), with separate Read and Write toggles.
+*   **Dynamic Capabilities Discovery**: Supports automatic schema discovery so the AI learns what tools are available without manual listing.
+
+For step-by-step setup instructions, see the [MCP Integration Guide](file:///server/mcp_docs.md).
 
 ---
 
