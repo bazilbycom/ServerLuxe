@@ -18,12 +18,12 @@ MCP communication is established using a lightweight local script (`mcp-bridge.j
 
 Before your AI can read or write any directories or databases, you must explicitly enable permissions in the Web panel.
 
-1. Open `db.php` or `fm.php` in your browser.
-2. Open the **MCP & Auto-Update** panel from the sidebar (or Maintenance section).
+1. Open **`db.php`** (for databases) or **`fm.php`** (for files) in your browser.
+2. Open the **MCP & Auto-Update** panel from the sidebar.
 3. Under **AI & MCP Permissions**:
-   - For databases: Check **Read** or **Write** next to each database you want to share.
-   - For folders: Add folder absolute paths and check **Read** or **Write** for each.
-4. Click **Save Permissions**. This creates a secure `mcp_config.json` configuration file on your server.
+   - **For databases (`db.php`)**: Check **Read** or **Write** next to each database you want to share.
+   - **For folders (`fm.php`)**: Add folder absolute paths and check **Read** or **Write** for each.
+4. Click **Save Permissions**. This automatically creates and configures a secure `mcp_config.json` configuration file on your server with appropriate permissions.
 
 ---
 
@@ -31,14 +31,13 @@ Before your AI can read or write any directories or databases, you must explicit
 
 Copy the configuration block directly from the **MCP & Auto-Update** panel in your browser, or configure it manually:
 
-### Claude Desktop
-
-Add this configuration to your Claude Desktop config file (located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+### Database Manager (`db.php`) Configuration
+Use this to let your AI read, describe, and query your database tables:
 
 ```json
 {
   "mcpServers": {
-    "serverluxe": {
+    "serverluxe-db": {
       "command": "node",
       "args": [
         "/absolute/path/to/serverluxe/server/mcp-bridge.js",
@@ -50,15 +49,45 @@ Add this configuration to your Claude Desktop config file (located at `~/Library
 }
 ```
 
-### Cursor
+### File Manager (`fm.php`) Configuration
+Use this to let your AI view, read, write, or delete files in permitted directories:
 
-1. Go to **Settings** -> **Features** -> **MCP**.
-2. Click **+ Add New MCP Server**.
-3. Fill out:
-   - **Name**: `serverluxe`
-   - **Type**: `command`
-   - **Command**: `node /absolute/path/to/serverluxe/server/mcp-bridge.js --url https://yourdomain.com/admin/db.php --key YOUR_API_KEY`
-4. Click **Save**.
+```json
+{
+  "mcpServers": {
+    "serverluxe-files": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/serverluxe/server/mcp-bridge.js",
+        "--url", "https://yourdomain.com/admin/fm.php",
+        "--key", "YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+---
+
+## Exposed Tools
+
+### Database Manager (`db.php`) Tools:
+*   **`list_tables`**: Lists all tables in the specified database.
+    *   *Arguments*: `database` (string, required)
+*   **`describe_table`**: Gets the columns and description of a table.
+    *   *Arguments*: `database` (string, required), `table` (string, required)
+*   **`query_database`**: Runs custom SQL queries. Select queries require `read` permission, while write queries require both `read` and `write` permissions.
+    *   *Arguments*: `database` (string, required), `query` (string, required)
+
+### File Manager (`fm.php`) Tools:
+*   **`list_directory`**: Lists directory contents.
+    *   *Arguments*: `path` (string, required)
+*   **`read_file`**: Reads text content of a file.
+    *   *Arguments*: `path` (string, required)
+*   **`write_file`**: Writes or creates text content for a file.
+    *   *Arguments*: `path` (string, required), `content` (string, required)
+*   **`delete_file`**: Deletes a file or folder.
+    *   *Arguments*: `path` (string, required)
 
 ---
 
