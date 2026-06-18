@@ -14,7 +14,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 ---
 
-## ✨ Features
+## Features
 
 - **Zero Dependencies** - Single PHP files, no complex framework dependencies. Just drop and run.
 - **Beautiful UI/UX** - Glassmorphism design, dark mode optimized, smooth animations, mobile-first responsive layout
@@ -27,7 +27,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 ---
 
-## 📸 Gallery
+## Gallery
 
 <div align="center">
   <h3>SQLuxe - Database Management</h3>
@@ -55,7 +55,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 ---
 
-## �📱 Mobile App
+## Mobile App
 
 ### Android App (Available on Google Play)
 
@@ -82,7 +82,7 @@ iOS version is available as **open-source code** - you can build it yourself usi
 
 ---
 
-## ⚙️ Modules
+## Modules
 
 ### 1. **SQLuxe** - Database Manager (`db.php`)
 
@@ -142,7 +142,7 @@ curl -X POST https://example.com/admin/fm.php \
 
 ---
 
-## 🤖 AI & Model Context Protocol (MCP)
+## AI & Model Context Protocol (MCP)
 
 ServerLuxe supports the **Model Context Protocol (MCP)**, allowing AI assistants (like Claude, Cursor, and other agents) to securely read, describe, query, and edit databases and files directly on your remote server.
 
@@ -155,7 +155,7 @@ For step-by-step setup instructions, see the [MCP Integration Guide](file:///ser
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Web server running PHP 5.6+ (Apache, Nginx, etc.)
@@ -205,7 +205,7 @@ ServerLuxe supports a **one-file automated remote installation**:
 
 ---
 
-## 📚 Build Documentation
+## Build Documentation
 
 ### Android Build Guide
 
@@ -418,7 +418,7 @@ npx cap copy ios
 
 ---
 
-## 🛡️ Security
+## Security
 
 ### Built-in Security Features
 
@@ -542,7 +542,7 @@ Contributions are welcome! Here's how to help:
 
 ---
 
-## 📄 License
+## License
 
 MIT License - Free for personal and commercial use. See LICENSE file for details.
 
