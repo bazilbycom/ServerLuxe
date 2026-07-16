@@ -1667,7 +1667,7 @@ if ($isConnected) {
                             <span x-text="selected"></span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" :style="open ? 'transform: rotate(180deg)' : ''" style="transition: transform 0.2s;"><path d="m6 9 6 6 6-6"/></svg>
                         </button>
-                        <div x-show="open" @click.outside="open = false" x-cloak x-transition class="modal-card" style="position: absolute; top: 110%; left: 0; right: 0; z-index: 100; max-height: 250px; overflow-y: auto; padding: 0.25rem; border: 1px solid var(--border); background: var(--bg-elevated); box-shadow: var(--shadow-xl);">
+                        <div x-show="open" @click.outside="open = false" x-cloak x-transition style="display: flex; flex-direction: column; position: absolute; top: 110%; left: 0; right: 0; z-index: 100; max-height: 250px; overflow-y: auto; padding: 0.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-elevated); box-shadow: var(--shadow-xl);">
                             <?php foreach ($databases as $dbName): ?>
                                 <button 
                                     class="table-link" 
