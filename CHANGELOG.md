@@ -4,6 +4,10 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.3.4] - 2026-07-16
+### Fixed
+- **Database dropdown layout**: The sidebar database dropdown was displaying options horizontally due to inheriting the `.modal-card` grid layout on desktop.
+
 ## [1.3.3] - 2026-07-16
 ### Fixed
 - **Broken MCP modal tag**: Restored the closing `>` on the modal card `<div>` so Alpine directives (`.outside`, `x-data`) are properly parsed instead of rendering as visible text.
