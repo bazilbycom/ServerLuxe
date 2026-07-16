@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.2.9');
+define('VERSION', '1.3.1');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -632,6 +632,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'connect') {
                 'database' => $_POST['database'] ?? '',
                 'is_master' => true
             ];
+            // Daily master-password gate marker.
+            $_SESSION['auth_date'] = date('Y-m-d');
         } else {
             $error = "Invalid System Password.";
         }
@@ -1309,8 +1311,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'toggle_readonly') {
     exit;
 }
 
-// Auth handled at app level (fingerprint). Auto-connect with defaults for web browser access.
-if (!isset($_SESSION['db_config']) && !is_api_request()) {
+// Daily master-password gate for the web UI: if not yet authed today, do NOT
+// auto-connect web browsers. They must submit the master password (handled by the
+// login form). API-key / MCP requests are unaffected by this gate.
+$today = date('Y-m-d');
+$db_needs_auth = (empty($_SESSION['db_config']) || ($_SESSION['auth_date'] ?? '') !== $today) && !is_api_request();
+if ($db_needs_auth) {
+    // Leave db_config unset so the login screen is shown.
+} elseif (!isset($_SESSION['db_config']) && !is_api_request()) {
     $_SESSION['db_config'] = [
         'host'     => DEFAULT_HOST,
         'port'     => DEFAULT_PORT,
@@ -1408,7 +1416,9 @@ if ($isConnected) {
             .header-right { gap: 0.5rem !important; }
             .main-content { padding: 0.75rem; }
             .modal-overlay { padding: 0.5rem; }
-            .modal-card { max-height: 95vh; }
+            .modal-card { max-height: 95vh; display: flex; flex-direction: column; grid-template-columns: unset; grid-template-rows: unset; grid-template-areas: unset; }
+            .modal-footer { flex-direction: row; border-left: none; border-top: 1px solid var(--border); min-width: unset; max-width: unset; }
+            .modal-footer .btn { width: auto; }
             .stat-badge { padding: 0.4rem 0.6rem; font-size: 0.75rem; }
         }
 
@@ -1463,10 +1473,17 @@ if ($isConnected) {
         @keyframes slideUpFade { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 1.5rem; }
-        .modal-card { background: var(--bg-surface); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: var(--shadow-xl); display: flex; flex-direction: column; }
-        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-        .modal-body { padding: 1.5rem; }
-        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        .modal-card { background: var(--bg-surface); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; border: 1px solid var(--border); box-shadow: var(--shadow-xl); display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; flex-shrink: 0; flex-wrap: wrap; }
+        @media (min-width: 700px) {
+            .modal-card { max-width: 860px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; grid-template-areas: "mhdr mhdr" "mbdy mftr"; max-height: 85vh; }
+            .modal-header { grid-area: mhdr; }
+            .modal-body { grid-area: mbdy; overflow-y: auto; }
+            .modal-footer { grid-area: mftr; flex-direction: column; justify-content: flex-end; border-top: none; border-left: 1px solid var(--border); min-width: 160px; max-width: 200px; }
+            .modal-footer .btn { width: 100%; justify-content: center; }
+        }
 
         .tabs { display: flex; gap: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
         .tab { padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600; font-size: 0.875rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
@@ -1863,9 +1880,9 @@ if ($isConnected) {
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: auto;">
-                                    <button @click.stop="renameTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700;">RENAME</button>
-                                    <button @click.stop="optimizeTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700; color: var(--accent);">OPTI</button>
-                                    <button @click.stop="dropTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);">DROP</button>
+                                    <button @click.stop="renameTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700; border-color: rgba(255, 255, 255, 0.1);">Rename</button>
+                                    <button @click.stop="optimizeTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700; color: var(--accent); border-color: rgba(34, 211, 238, 0.2);">Optimize</button>
+                                    <button @click.stop="dropTable(stat.Name)" class="btn btn-ghost" :disabled="isReadOnly" :style="isReadOnly ? 'opacity: 0.4; cursor: not-allowed; pointer-events: none;' : ''" style="flex: 1; padding: 0.4rem; font-size: 0.7rem; font-weight: 700; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);">Drop</button>
                                 </div>
                             </div>
                         </template>
@@ -3110,7 +3127,7 @@ if ($isConnected) {
     </script>
         <!-- QR Modal -->
         <div class="modal-overlay" x-show="showQR" x-cloak @click.self="showQR = false">
-            <div class="modal-card" style="max-width: 400px; text-align: center;">
+            <div class="modal-card" style="max-width: 400px; text-align: center; display: flex; flex-direction: column; grid-template-columns: unset; grid-template-rows: unset; grid-template-areas: unset;">
                 <div class="modal-header">
                     <h3 style="font-weight: 800;">Connect to Mobile App</h3>
                     <button @click="showQR = false" class="btn btn-ghost" style="padding: 0.25rem; border: none;">&times;</button>
@@ -3122,8 +3139,8 @@ if ($isConnected) {
                     </div>
                     <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; word-break: break-all; background: var(--bg-deep); padding: 0.75rem; border-radius: 0.5rem; opacity: 0.7;" x-text="qrData"></div>
                 </div>
-                <div class="modal-footer">
-                    <button @click="showQR = false" class="btn btn-primary">DONE</button>
+                <div class="modal-footer" style="border-top: 1px solid var(--border); border-left: none; flex-direction: row; min-width: unset; max-width: unset; justify-content: flex-end;">
+                    <button @click="showQR = false" class="btn btn-primary" style="width: auto;">DONE</button>
                 </div>
             </div>
         </div>

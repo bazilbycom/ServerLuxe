@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.2.9');
+define('VERSION', '1.3.1');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -157,6 +157,8 @@ function init_session_after_login() {
     $_SESSION['fm_authenticated'] = true;
     $_SESSION['last_activity'] = time();
     $_SESSION['login_time'] = time();
+    // Daily master-password gate: require re-auth once per calendar day.
+    $_SESSION['auth_date'] = date('Y-m-d');
 }
 
 // SECURITY: CSRF Token protection
@@ -272,8 +274,15 @@ function has_mcp_permission($type, $name, $access_type) {
     if (!isset($config[$type])) return false;
     
     if ($type === 'folders') {
+        // Resolve the path; for new/non-existent files fall back to the parent dir
+        // so we can still grant create access inside an allowed folder.
         $name_real = realpath($name);
-        if ($name_real === false) return false;
+        if ($name_real === false) {
+            $parent = dirname($name);
+            $parent_real = realpath($parent);
+            if ($parent_real === false) return false;
+            $name_real = rtrim($parent_real, '/') . '/' . basename($name);
+        }
         $name_normalized = str_replace('\\', '/', $name_real);
         foreach ($config['folders'] as $path => $perms) {
             $path_real = realpath($path);
@@ -642,9 +651,32 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Auth handled at app level (fingerprint). Auto-authenticate for all access.
-if (!isset($_SESSION['fm_authenticated'])) {
-    init_session_after_login();
+// Daily master-password gate: prompt for the master password on the web UI
+// at least once per calendar day. API-key (MCP / remote) requests are unaffected.
+$today = date('Y-m-d');
+$needs_auth = empty($_SESSION['fm_authenticated']) || ($_SESSION['auth_date'] ?? '') !== $today;
+if ($needs_auth && !is_api_request()) {
+    // Force the login screen; do NOT auto-authenticate web browsers.
+    $_SESSION['fm_authenticated'] = false;
+}
+
+// Handle master-password login (web UI)
+if (isset($_POST['action']) && $_POST['action'] === 'login') {
+    if (empty(MASTER_PASS)) {
+        // No master password configured -> allow straight in
+        init_session_after_login();
+    } else {
+        $provided = $_POST['password'] ?? '';
+        if (verify_master_password($provided)) {
+            init_session_after_login();
+        } else {
+            $login_error = 'Invalid master password.';
+        }
+    }
+    if (!empty($_SESSION['fm_authenticated'])) {
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
 }
 
 // Show HTML UI (Login or Dashboard)
@@ -987,10 +1019,17 @@ window.switchApp = function(url) {
         @keyframes slideUpFade { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 1.5rem; }
-        .modal-card { background: var(--bg-surface); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: var(--shadow-xl); display: flex; flex-direction: column; }
-        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-        .modal-body { padding: 1.5rem; }
-        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        .modal-card { background: var(--bg-surface); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; border: 1px solid var(--border); box-shadow: var(--shadow-xl); display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; flex-shrink: 0; flex-wrap: wrap; }
+        @media (min-width: 700px) {
+            .modal-card { max-width: 860px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; grid-template-areas: "mhdr mhdr" "mbdy mftr"; max-height: 85vh; }
+            .modal-header { grid-area: mhdr; }
+            .modal-body { grid-area: mbdy; overflow-y: auto; }
+            .modal-footer { grid-area: mftr; flex-direction: column; justify-content: flex-end; border-top: none; border-left: 1px solid var(--border); min-width: 160px; max-width: 200px; }
+            .modal-footer .btn { width: 100%; justify-content: center; }
+        }
 
         .tabs { display: flex; gap: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
         .tab { padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600; font-size: 0.875rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
@@ -1039,6 +1078,10 @@ window.switchApp = function(url) {
             .btn-group::-webkit-scrollbar { display: none; }
             .btn-group-item { flex: 1; justify-content: center; padding: 0.75rem 0.5rem; }
             .stat-badge { width: 100%; justify-content: center; order: -1; }
+            .modal-overlay { padding: 0.5rem; }
+            .modal-card { max-height: 95vh; display: flex; flex-direction: column; grid-template-columns: unset; grid-template-rows: unset; grid-template-areas: unset; }
+            .modal-footer { flex-direction: row; border-left: none; border-top: 1px solid var(--border); min-width: unset; max-width: unset; }
+            .modal-footer .btn { width: auto; }
         }
 
 
@@ -2230,7 +2273,7 @@ window.switchApp = function(url) {
 
     <!-- QR Modal -->
     <div class="modal-overlay" x-show="showQR" x-cloak @click.self="showQR = false">
-        <div class="modal-card" style="max-width: 400px; text-align: center;">
+        <div class="modal-card" style="max-width: 400px; text-align: center; display: flex; flex-direction: column; grid-template-columns: unset; grid-template-rows: unset; grid-template-areas: unset;">
             <div class="modal-header">
                 <h3 style="font-weight: 800;">Connect to Mobile App</h3>
                 <button @click="showQR = false" class="btn btn-ghost" style="padding: 0.25rem; border: none;">&times;</button>
@@ -2242,8 +2285,8 @@ window.switchApp = function(url) {
                 </div>
                 <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; word-break: break-all; background: var(--bg-deep); padding: 0.75rem; border-radius: 0.5rem; opacity: 0.7;" x-text="qrData"></div>
             </div>
-            <div class="modal-footer">
-                <button @click="showQR = false" class="btn btn-primary">DONE</button>
+            <div class="modal-footer" style="border-top: 1px solid var(--border); border-left: none; flex-direction: row; min-width: unset; max-width: unset; justify-content: flex-end;">
+                <button @click="showQR = false" class="btn btn-primary" style="width: auto;">DONE</button>
             </div>
         </div>
     </div>

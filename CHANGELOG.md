@@ -4,6 +4,24 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.3.1] - 2026-07-16
+### Added
+- **Daily Master-Password Gate**: The `fm.php` and `db.php` web UIs now require the master password at least once per calendar day. Web browsers are no longer auto-authenticated; API-key / MCP access is unaffected.
+- **Self-Documenting MCP Bridge**: `mcp-bridge.js` now ships with a full protocol/usage doc header and a `--help` flag so AI agents and operators can understand the stdio<->HTTPS contract.
+- **New-File MCP Write Support**: `fm.php` folder ACLs now permit creating new files inside allowed folders (previously only existing files could be written).
+
+### fixed
+- Resolved MCP write failures for not-yet-existing files under permitted directories.
+
+---
+
+## [1.3.0] - 2026-06-19
+### Changed
+- **Horizontal Modals on Desktop**: On viewports ≥700px, all modals in `db.php` and `fm.php` now display in a two-column layout — the body content fills the left side and the action buttons appear in a right-side panel separated by a border, giving a modern side-by-side UX instead of a stacked footer. Mobile layouts (≤600px) revert cleanly to the original vertical stack.
+- Small modals (QR code connector) are explicitly kept in the vertical layout on all screen sizes for better visual balance.
+
+---
+
 ## [1.2.9] - 2026-06-18
 ### Added
 - Richer MCP documentation explaining tool capabilities and argument details for both `db.php` and `fm.php`.

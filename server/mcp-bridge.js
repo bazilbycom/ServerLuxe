@@ -2,7 +2,79 @@
 
 /**
  * ServerLuxe MCP Bridge
- * Translates standard MCP stdio JSON-RPC messages into HTTP API calls for remote db.php and fm.php.
+ * =====================
+ * Translates standard MCP (Model Context Protocol) stdio JSON-RPC messages into
+ * HTTP API calls against a remote ServerLuxe deployment (db.php / fm.php).
+ *
+ * WHAT THIS IS
+ * ------------
+ * A thin, dependency-free stdio<->HTTPS proxy. An AI agent (or any MCP client)
+ * speaks to THIS process over stdin/stdout using JSON-RPC 2.0, and this bridge
+ * forwards each request to the remote ServerLuxe endpoint over HTTPS, returning
+ * the server's JSON response back over stdout. It does NOT implement the tools
+ * itself — it brokers them from the server.
+ *
+ * USAGE
+ * -----
+ *   node mcp-bridge.js --url <SERVERLUXE_URL> --key <API_KEY>
+ *
+ *   --url  Base URL of the ServerLuxe endpoint, e.g.
+ *          https://app.tharkistaan.com/serverluxe/fm.php  (file manager)
+ *          https://app.tharkistaan.com/serverluxe/db.php  (database)
+ *   --key  The API key (X-API-KEY). Required for all remote calls.
+ *
+ *   Run `node mcp-bridge.js --help` to print this information.
+ *
+ * WIRING IT INTO AN MCP CLIENT
+ * ----------------------------
+ * Add a server entry to your mcp_config.json:
+ *   {
+ *     "mcpServers": {
+ *       "serverluxe": {
+ *         "command": "node",
+ *         "args": [
+ *           "/absolute/path/to/mcp-bridge.js",
+ *           "--url", "https://app.tharkistaan.com/serverluxe/fm.php",
+ *           "--key", "YOUR_API_KEY"
+ *         ]
+ *       }
+ *     }
+ *   }
+ *
+ * PROTOCOL CONTRACT (what goes over the wire)
+ * --------------------------------------------
+ * Each stdin line is a JSON-RPC 2.0 request, e.g.:
+ *   {"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+ *   {"jsonrpc":"2.0","id":1,"method":"tools/call",
+ *    "params":{"name":"read_file","arguments":{"path":"/abs/path/file.php"}}}
+ *
+ * The bridge appends `?action=mcp_api` to the URL and sends:
+ *   POST <url>?action=mcp_api
+ *   Headers: Content-Type: application/json, X-API-KEY: <key>
+ * Body: the raw JSON-RPC request.
+ *
+ * The server replies with a JSON-RPC result that is printed verbatim to stdout.
+ *
+ * AVAILABLE TOOLS (delegated to the server; call tools/list for the live list)
+ * ---------------------------------------------------------------------------
+ *   File manager (fm.php):
+ *     - list_directory { path }            -> lists a directory
+ *     - read_file      { path }            -> reads a file (must be in an allowed folder)
+ *     - write_file     { path, content }   -> writes/creates a file
+ *     - delete_file    { path }            -> deletes a file or directory
+ *   Database (db.php):
+ *     - query_database, list_tables, describe_table, ... (per server config)
+ *
+ * NOTES FOR AI AGENTS
+ * -------------------
+ * - Paths are ABSOLUTE on the remote server (e.g. /www/wwwroot/app.tharkistaan.com/...).
+ *   Relative paths are rejected ("Invalid path or directory traversal detected").
+ * - Folder access is gated by server-side mcp_config.json `folders` (read/write ACLs).
+ *   A "does not have Write/Read access" error means the target folder isn't granted
+ *   on the server — not a bridge problem.
+ * - The web UI (fm.php / db.php) asks for the master password once per day; this
+ *   bridge authenticates with the API key and is unaffected by that gate.
+ * - Responses are forwarded as-is; on HTTP error the bridge emits a JSON-RPC error.
  */
 
 const http = require('http');
@@ -24,9 +96,32 @@ for (let i = 0; i < args.length; i++) {
     }
 }
 
+// --help flag: print documentation and exit (handy for AI agents / operators)
+if (args.includes('--help') || args.includes('-h')) {
+    console.error(`ServerLuxe MCP Bridge
+
+Forwards MCP stdio JSON-RPC to a remote ServerLuxe endpoint (db.php / fm.php).
+
+Usage:
+  node mcp-bridge.js --url <SERVERLUXE_URL> --key <API_KEY>
+
+Examples:
+  node mcp-bridge.js --url https://app.tharkistaan.com/serverluxe/fm.php --key <API_KEY>
+  node mcp-bridge.js --url https://app.tharkistaan.com/serverluxe/db.php --key <API_KEY>
+
+Required:
+  --url   ServerLuxe endpoint base URL
+  --key   API key (sent as X-API-KEY header)
+
+The bridge appends ?action=mcp_api to the URL and speaks JSON-RPC 2.0 over stdin/stdout.
+See the file header comment for the full protocol contract and tool list.`);
+    process.exit(0);
+}
+
 if (!urlStr || !apiKey) {
     console.error('Error: Missing required parameters.');
     console.error('Usage: node mcp-bridge.js --url <server_luxe_url> --key <api_key>');
+    console.error('Run "node mcp-bridge.js --help" for details.');
     process.exit(1);
 }
 

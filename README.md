@@ -4,7 +4,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 <div align="center">
 
-![ServerLuxe Badge](https://img.shields.io/badge/version-1.2.9-cyan?style=flat-square)
+![ServerLuxe Badge](https://img.shields.io/badge/version-1.3.1-cyan?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen?style=flat-square)
 
@@ -165,37 +165,18 @@ For step-by-step setup instructions, see the [MCP Integration Guide](file:///ser
 
 ### Installation (Web UI)
 
-ServerLuxe supports a **one-file automated remote installation**:
+ServerLuxe installs as a **single file** — no Composer, no build step.
 
-1. **Download `index.php`** directly onto your web server in your desired directory (e.g., `admin/`):
+1. **Drop `index.php` on your server** (e.g. into `admin/`):
    ```bash
-   # Using curl:
    curl -o index.php https://raw.githubusercontent.com/bazilbycom/ServerLuxe/main/server/index.php
-   
-   # Or using wget:
-   wget https://raw.githubusercontent.com/bazilbycom/ServerLuxe/main/server/index.php
    ```
+2. **Open it in a browser** → `https://yourdomain.com/admin/index.php`.
+3. **Run the 2-step wizard**: set a **Master Password** + **API Key**, optionally add DB defaults, and it auto-writes `.env` and pulls `db.php`, `fm.php`, `mcp-bridge.js`, `mcp_docs.md`.
+4. **Done.** Use the same URL to log in; the UI asks for the master password once per day.
 
-2. **Access in your browser**:
-   Navigate to the URL where you placed the file (e.g., `https://yourdomain.com/admin/index.php`).
-
-3. **Complete the Setup Wizard**:
-   * **Step 1 (Security)**: Set a secure **Master Password** to protect your panels and an **API Access Key** for AI MCP client and mobile app connections.
-   * **Step 2 (Database Defaults - Optional)**: Enter default MySQL connection details if you want SQLuxe to connect automatically. You can click **Skip DB Config & Install** to skip database setup.
-   
-   Once submitted, the installer will automatically:
-   * Write your secure `.env` configuration file.
-   * Download the latest versions of `db.php`, `fm.php`, `mcp-bridge.js`, and `mcp_docs.md` directly from the official GitHub repository.
-   * Configure permissions automatically.
-   
-4. **All Set!**
-   * Central Dashboard: `https://yourdomain.com/admin/index.php`
-   * Database Manager: `https://yourdomain.com/admin/db.php`
-   * File Manager: `https://yourdomain.com/admin/fm.php`
-
-5. **Login**
-   - Password: Use `MASTER_PASS` from `.env` (or default configuration)
-   - API Key (mobile/API): Use `API_KEY` from `.env`
+   - Database Manager: `…/db.php`  •  File Manager: `…/fm.php`
+   - API Key (mobile / MCP): from `.env` `API_KEY`
 
 ### Installation (Mobile App)
 
