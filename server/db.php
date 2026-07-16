@@ -469,6 +469,14 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
                             ],
                             'required' => ['database', 'table']
                         ]
+                    ],
+                    [
+                        'name' => 'get_server_docs',
+                        'description' => 'Read the full ServerLuxe MCP documentation. Call this first to understand available tools, permissions, and security best practices.',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => []
+                        ]
                     ]
                 ]
             ]
@@ -481,7 +489,15 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
         $arguments = $params['arguments'] ?? [];
         $result = ['content' => [], 'isError' => false];
         
-        if ($tool === 'query_database') {
+        if ($tool === 'get_server_docs') {
+            $docsFile = __DIR__ . '/mcp_docs.md';
+            if (file_exists($docsFile)) {
+                $result['content'][] = ['type' => 'text', 'text' => file_get_contents($docsFile)];
+            } else {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => 'Documentation file mcp_docs.md not found.'];
+            }
+        } elseif ($tool === 'query_database') {
             $database = $arguments['database'] ?? '';
             $query = $arguments['query'] ?? '';
             $is_write = !preg_match('/^(SELECT|SHOW|DESCRIBE|EXPLAIN)\s+/i', trim($query));
@@ -2408,7 +2424,7 @@ if ($isConnected) {
 }</pre>
                                 </div>
                                 <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
-                                    Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server. <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a>
+                                    Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server. <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a> &mdash; your AI can also call the <code style="color:#fff;">get_server_docs</code> tool for in-protocol documentation.
                                 </span>
                             </div>
 
