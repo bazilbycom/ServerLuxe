@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.3.6');
+define('VERSION', '1.3.7');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -173,21 +173,23 @@ function validate_csrf_token() {
     // API key requests don't need CSRF (stateless)
     $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
     if (!empty(API_KEY) && hash_equals(API_KEY, $provided_key)) {
-        return true;
+        return;
     }
 
     // Session-based requests need CSRF
     if (empty($_SESSION['fm_authenticated'])) {
-        return false;
+        header('Content-Type: application/json', true, 403);
+        echo json_encode(['error' => 'CSRF validation failed: session not authenticated.']);
+        exit;
     }
 
     $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
 
-    if (empty($token) || empty($_SESSION['csrf_token'])) {
-        return false;
+    if (empty($token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        header('Content-Type: application/json', true, 403);
+        echo json_encode(['error' => 'CSRF token mismatch or session expired.']);
+        exit;
     }
-
-    return hash_equals($_SESSION['csrf_token'], $token);
 }
 
 // SECURITY: Rate limiting for login attempts
@@ -419,13 +421,6 @@ function apply_update() {
     }
     if (file_put_contents($fm_file_path, $github_fm) === false) {
         return "Failed to write to {$fm_file_path}. Check permissions.";
-    }
-    
-    if (is_dir(__DIR__ . '/../.git')) {
-        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
-        if (trim($git_check) === 'true') {
-            @shell_exec('git reset --hard origin/main 2>&1');
-        }
     }
     
     return true;

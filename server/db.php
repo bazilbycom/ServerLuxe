@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.3.6');
+define('VERSION', '1.3.7');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -396,13 +396,6 @@ function apply_update() {
     }
     if (file_put_contents($fm_file_path, $github_fm) === false) {
         return "Failed to write to {$fm_file_path}. Check permissions.";
-    }
-    
-    if (is_dir(__DIR__ . '/../.git')) {
-        $git_check = @shell_exec('git rev-parse --is-inside-work-tree 2>&1');
-        if (trim($git_check) === 'true') {
-            @shell_exec('git reset --hard origin/main 2>&1');
-        }
     }
     
     return true;
