@@ -2171,7 +2171,7 @@ window.switchApp = function(url) {
 
     <!-- MCP & Auto-Update Modal -->
     <div class="modal-overlay" x-show="showMcpModal" x-cloak x-transition>
-        <div class="modal-card modal-panel" style="width: 95%;"> @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
+        <div class="modal-card modal-panel" style="width: 95%;" @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
             <div class="modal-header">
                 <div class="flex items-center gap-2">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
