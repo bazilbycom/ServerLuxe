@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.3.4');
+define('VERSION', '1.3.5');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -2255,7 +2255,7 @@ window.switchApp = function(url) {
 }</pre>
                         </div>
                         <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
-                            Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server.
+                            Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server. <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a>
                         </span>
                     </div>
 

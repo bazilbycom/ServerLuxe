@@ -4,6 +4,10 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.3.5] - 2026-07-16
+### Added
+- **MCP Docs Link**: Added a "Full MCP Docs" link pointing to `mcp_docs.md` in the AI Client Config help text.
+
 ## [1.3.4] - 2026-07-16
 ### Fixed
 - **Database dropdown layout**: The sidebar database dropdown was displaying options horizontally due to inheriting the `.modal-card` grid layout on desktop.
