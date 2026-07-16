@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.3.1');
+define('VERSION', '1.3.2');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -1030,6 +1030,10 @@ window.switchApp = function(url) {
             .modal-footer { grid-area: mftr; flex-direction: column; justify-content: flex-end; border-top: none; border-left: 1px solid var(--border); min-width: 160px; max-width: 200px; }
             .modal-footer .btn { width: 100%; justify-content: center; }
         }
+            /* Panels with internal tabs (no action footer) stay single-column on desktop */
+            .modal-panel { grid-template-columns: 1fr; grid-template-rows: auto 1fr; grid-template-areas: "mhdr" "mbdy"; max-width: 700px; }
+            .modal-panel .modal-body { overflow-y: auto; }
+
 
         .tabs { display: flex; gap: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
         .tab { padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600; font-size: 0.875rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; }
@@ -1551,6 +1555,7 @@ window.switchApp = function(url) {
                 mcpConfig: { databases: {}, folders: {} },
                 newMcpFolder: '',
                 updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
+                mcpCopied: false,
 
 
                 get pathSegments() {
@@ -1812,7 +1817,27 @@ window.switchApp = function(url) {
                     } finally {
                         this.loading = false;
                     }
+                },                
+                async copyMcpConfig() {
+                    try {
+                        const text = this.$refs.mcpConfigPre ? this.$refs.mcpConfigPre.textContent : "";
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(text);
+                        } else {
+                            const ta = document.createElement("textarea");
+                            ta.value = text; document.body.appendChild(ta); ta.select();
+                            document.execCommand("copy"); document.body.removeChild(ta);
+                        }
+                        this.mcpCopied = true;
+                        window.haptic("success");
+                        setTimeout(() => { this.mcpCopied = false; }, 2000);
+                    } catch(e) {
+                        window.haptic("error");
+                        window.uiAlert("Failed to copy MCP config.");
+                    }
                 },
+
+
                 async checkUpdates() {
                     this.updateInfo.loading = true;
                     this.updateInfo.error = '';
@@ -2146,7 +2171,7 @@ window.switchApp = function(url) {
 
     <!-- MCP & Auto-Update Modal -->
     <div class="modal-overlay" x-show="showMcpModal" x-cloak x-transition>
-        <div class="modal-card" style="max-width: 700px; width: 95%; height: 80vh;" @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
+        <div class="modal-card modal-panel" style="width: 95%;"> @click.outside="showMcpModal = false" x-data="{ subTab: 'mcp' }">
             <div class="modal-header">
                 <div class="flex items-center gap-2">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -2206,8 +2231,14 @@ window.switchApp = function(url) {
                     <!-- Setup Instructions -->
                     <div>
                         <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                                    <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+                                        <button @click="copyMcpConfig" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.7rem; color: var(--accent); border-color: rgba(34,211,238,0.3);">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                            <span x-text="mcpCopied ? 'Copied!' : 'Copy JSON'"></span>
+                                        </button>
+                                    </div>
                         <div style="background: #000; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.75rem; color: #fff; overflow-x: auto;">
-                            <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">{
+                            <pre x-ref="mcpConfigPre" style="margin: 0; white-space: pre-wrap; word-break: break-all;">{
   "mcpServers": {
     "serverluxe": {
       "command": "node",

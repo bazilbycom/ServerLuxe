@@ -4,6 +4,11 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.3.2] - 2026-07-16
+### Changed
+- **MCP & Auto-Update Modal UI**: The MCP panel now renders single-column on desktop (no more empty action-footer column); removed the fixed 80vh height so the panel scrolls naturally.
+- **One-Click Copy MCP JSON**: Added a "Copy JSON" button to the AI Client Config block in the MCP panel so the `mcp_config` snippet can be copied in one click (with clipboard fallback and haptic feedback).
+
 ## [1.3.1] - 2026-07-16
 ### Added
 - **Daily Master-Password Gate**: The `fm.php` and `db.php` web UIs now require the master password at least once per calendar day. Web browsers are no longer auto-authenticated; API-key / MCP access is unaffected.
