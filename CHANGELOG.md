@@ -4,6 +4,10 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.3.3] - 2026-07-16
+### Fixed
+- **Broken MCP modal tag**: Restored the closing `>` on the modal card `<div>` so Alpine directives (`.outside`, `x-data`) are properly parsed instead of rendering as visible text.
+
 ## [1.3.2] - 2026-07-16
 ### Changed
 - **MCP & Auto-Update Modal UI**: The MCP panel now renders single-column on desktop (no more empty action-footer column); removed the fixed 80vh height so the panel scrolls naturally.
