@@ -142,8 +142,11 @@ rl.on('line', (line) => {
     }
 });
 
-function forwardRequest(request) {
-    const url = new URL(urlStr);
+function forwardRequest(request, targetUrl, redirectsLeft) {
+    if (targetUrl === undefined) targetUrl = urlStr;
+    if (redirectsLeft === undefined) redirectsLeft = 5;
+
+    const url = new URL(targetUrl);
     const isHttps = url.protocol === 'https:';
     const client = isHttps ? https : http;
 
@@ -166,6 +169,18 @@ function forwardRequest(request) {
     };
 
     const req = client.request(options, (res) => {
+        // Follow redirects (e.g. http -> https forced by host/CDN)
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            res.resume(); // discard body
+            if (redirectsLeft <= 0) {
+                sendError(request.id, -32603, 'Bridge connection error: too many redirects.');
+                return;
+            }
+            const nextUrl = new URL(res.headers.location, targetUrl).toString();
+            forwardRequest(request, nextUrl, redirectsLeft - 1);
+            return;
+        }
+
         let body = '';
         res.on('data', (chunk) => {
             body += chunk;

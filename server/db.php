@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.3.7');
+define('VERSION', '1.3.8');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -2393,6 +2393,10 @@ if ($isConnected) {
                             <!-- Setup Instructions -->
                             <div>
                                 <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                                <div style="margin-bottom: 0.75rem;">
+                                    <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Publicly accessible server URL (must be reachable from wherever your AI client runs — not localhost/internal IP unless the client runs on this same machine/network)</label>
+                                    <input type="text" x-model="mcpBaseUrl" @input="onMcpBaseUrlChange" placeholder="https://your-public-domain.com/serverluxe/db.php" style="width: 100%; padding: 0.5rem 0.75rem; background: #000; border: 1px solid var(--border); border-radius: var(--radius-md); color: #fff; font-family: monospace; font-size: 0.75rem;">
+                                </div>
                                     <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
                                         <button @click="copyMcpConfig" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.7rem; color: var(--accent); border-color: rgba(34,211,238,0.3);">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -2400,24 +2404,10 @@ if ($isConnected) {
                                         </button>
                                     </div>
                                 <div style="background: #000; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.75rem; color: #fff; overflow-x: auto;">
-                                    <pre x-ref="mcpConfigPre" style="margin: 0; white-space: pre-wrap; word-break: break-all;">{
-  "mcpServers": {
-    "serverluxe": {
-      "command": "node",
-      "args": [
-        "<?php echo str_replace('\\', '/', __DIR__ . '/mcp-bridge.js'); ?>",
-        "--url", "<?php 
-           $proto = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-           echo $proto . '://' . $_SERVER['HTTP_HOST'] . strtok($_SERVER['REQUEST_URI'], '?'); 
-        ?>",
-        "--key", "<?php echo htmlspecialchars(API_KEY); ?>"
-      ]
-    }
-  }
-}</pre>
+                                    <pre x-ref="mcpConfigPre" x-text="mcpConfigJson" style="margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
                                 </div>
                                 <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
-                                    Make sure to copy the <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> script to your local machine (or keep it in the project path) to allow your local AI to communicate with the server. <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a> &mdash; your AI can also call the <code style="color:#fff;">get_server_docs</code> tool for in-protocol documentation.
+                                    Replace <span style="color:#fff;font-family:monospace;">/absolute/path/to/mcp-bridge.js</span> with the path to <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> <strong>on the machine running your AI client</strong> (download it and copy it there — it must be a local path, not a path on this server). <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a> &mdash; your AI can also call the <code style="color:#fff;">get_server_docs</code> tool for in-protocol documentation.
                                 </span>
                             </div>
 
@@ -2611,6 +2601,10 @@ if ($isConnected) {
                 mcpConfig: { databases: {}, folders: {} },
                 updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
                 mcpCopied: false,
+                mcpBaseUrl: localStorage.getItem('mcpBaseUrl') || '<?php
+                    $proto = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+                    echo $proto . '://' . $_SERVER['HTTP_HOST'] . strtok($_SERVER['REQUEST_URI'], '?');
+                ?>',
                 isReadOnly: <?php echo !empty($_SESSION['read_only']) ? 'true' : 'false'; ?>,
                 csrfToken: '<?php echo $_SESSION['csrf_token']; ?>',
                 newTable: { name: '', columns: [{ name: 'id', type: 'INT', length: '11', primary: true, ai: true, null: false }] },
@@ -2625,6 +2619,20 @@ if ($isConnected) {
                     }
                 },
 
+                get mcpConfigJson() {
+                    const bridgePath = '/absolute/path/to/mcp-bridge.js';
+                    return JSON.stringify({
+                        mcpServers: {
+                            serverluxe: {
+                                command: 'node',
+                                args: [bridgePath, '--url', this.mcpBaseUrl, '--key', '<?php echo addslashes(API_KEY); ?>']
+                            }
+                        }
+                    }, null, 2);
+                },
+                onMcpBaseUrlChange() {
+                    localStorage.setItem('mcpBaseUrl', this.mcpBaseUrl);
+                },
                 get filteredTables() {
                     if (!this.tableSearchQuery) return this.allTables;
                     const q = this.tableSearchQuery.toLowerCase();
