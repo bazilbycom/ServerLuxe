@@ -49,7 +49,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.3.9');
+define('VERSION', '1.4.0');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -426,6 +426,129 @@ function apply_update() {
     return true;
 }
 
+// Shared file-manager tool executor, used by both the MCP JSON-RPC endpoint
+// and the plain REST API endpoint below.
+function execute_fm_tool($tool, $arguments) {
+    $result = ['content' => [], 'isError' => false];
+
+    if ($tool === 'get_server_docs') {
+        $docsFile = __DIR__ . '/mcp_docs.md';
+        if (file_exists($docsFile)) {
+            $result['content'][] = ['type' => 'text', 'text' => file_get_contents($docsFile)];
+        } else {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => 'Documentation file mcp_docs.md not found.'];
+        }
+        return $result;
+    }
+
+    $path = $arguments['path'] ?? '';
+    $base_dir = (DIRECTORY_SEPARATOR === '\\') ? substr(realpath(__DIR__), 0, 3) : '/';
+    $v = validate_path($base_dir, $path);
+
+    if (!$v['valid']) {
+        $result['isError'] = true;
+        $result['content'][] = ['type' => 'text', 'text' => "Error: Invalid path or directory traversal detected."];
+        return $result;
+    }
+
+    $resolved_path = $v['path'];
+
+    if ($tool === 'list_directory') {
+        if (!has_mcp_permission('folders', $resolved_path, 'read')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder '{$resolved_path}'."];
+        } elseif (!is_dir($resolved_path)) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a directory."];
+        } else {
+            $files = scandir($resolved_path);
+            $info = [];
+            foreach ($files as $f) {
+                if ($f === '.' || $f === '..') continue;
+                $fpath = $resolved_path . '/' . $f;
+                $info[] = [
+                    'name' => $f,
+                    'type' => is_dir($fpath) ? 'directory' : 'file',
+                    'size' => is_dir($fpath) ? 0 : filesize($fpath),
+                    'modified' => date('Y-m-d H:i:s', filemtime($fpath))
+                ];
+            }
+            $result['content'][] = ['type' => 'text', 'text' => json_encode($info, JSON_PRETTY_PRINT)];
+        }
+    } elseif ($tool === 'read_file') {
+        if (!has_mcp_permission('folders', $resolved_path, 'read')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder containing this file."];
+        } elseif (!is_file($resolved_path)) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a file."];
+        } else {
+            $result['content'][] = ['type' => 'text', 'text' => file_get_contents($resolved_path)];
+        }
+    } elseif ($tool === 'write_file') {
+        if (!has_mcp_permission('folders', $resolved_path, 'write')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file."];
+        } else {
+            $content = $arguments['content'] ?? '';
+            if (file_put_contents($resolved_path, $content) === false) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to write to file."];
+            } else {
+                $result['content'][] = ['type' => 'text', 'text' => "Success: File written successfully."];
+            }
+        }
+    } elseif ($tool === 'delete_file') {
+        if (!has_mcp_permission('folders', $resolved_path, 'write')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file/directory."];
+        } else {
+            $ok = is_dir($resolved_path) ? @rmdir($resolved_path) : @unlink($resolved_path);
+            if (!$ok) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to delete path."];
+            } else {
+                $result['content'][] = ['type' => 'text', 'text' => "Success: Path deleted successfully."];
+            }
+        }
+    } else {
+        $result['isError'] = true;
+        $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
+    }
+
+    return $result;
+}
+
+// Plain REST API endpoint for AI agents that can't spawn a local MCP bridge
+// process — a single HTTP call, no stdio/JSON-RPC required.
+// GET/POST ?action=api&tool=list_directory|read_file|write_file|delete_file|get_server_docs
+// Auth: X-API-KEY header (or api_key param). Params: path, content (write_file only).
+if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'api') {
+    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
+    header('Content-Type: application/json');
+    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+        header('HTTP/1.1 401 Unauthorized');
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+
+    $tool = $_REQUEST['tool'] ?? '';
+    $arguments = [
+        'path' => $_REQUEST['path'] ?? '',
+        'content' => $_REQUEST['content'] ?? ''
+    ];
+    $result = execute_fm_tool($tool, $arguments);
+
+    if ($result['isError']) {
+        header('HTTP/1.1 400 Bad Request');
+        echo json_encode(['success' => false, 'error' => $result['content'][0]['text'] ?? 'Unknown error']);
+    } else {
+        echo json_encode(['success' => true, 'result' => $result['content'][0]['text'] ?? '']);
+    }
+    exit;
+}
+
 // MCP API endpoint
 if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
     $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
@@ -515,100 +638,7 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
     if ($method === 'tools/call') {
         $tool = $params['name'] ?? '';
         $arguments = $params['arguments'] ?? [];
-        $result = ['content' => [], 'isError' => false];
-        
-        if ($tool === 'get_server_docs') {
-            $docsFile = __DIR__ . '/mcp_docs.md';
-            if (file_exists($docsFile)) {
-                $result['content'][] = ['type' => 'text', 'text' => file_get_contents($docsFile)];
-            } else {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => 'Documentation file mcp_docs.md not found.'];
-            }
-        } else {
-        $path = $arguments['path'] ?? '';
-        $base_dir = (DIRECTORY_SEPARATOR === '\\') ? substr(realpath(__DIR__), 0, 3) : '/';
-        $v = validate_path($base_dir, $path);
-        
-        if (!$v['valid']) {
-            $result['isError'] = true;
-            $result['content'][] = ['type' => 'text', 'text' => "Error: Invalid path or directory traversal detected."];
-        } else {
-            $resolved_path = $v['path'];
-            
-            if ($tool === 'list_directory') {
-                if (!has_mcp_permission('folders', $resolved_path, 'read')) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder '{$resolved_path}'."];
-                } else {
-                    if (!is_dir($resolved_path)) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a directory."];
-                    } else {
-                        $files = scandir($resolved_path);
-                        $info = [];
-                        foreach ($files as $f) {
-                            if ($f === '.' || $f === '..') continue;
-                            $fpath = $resolved_path . '/' . $f;
-                            $info[] = [
-                                'name' => $f,
-                                'type' => is_dir($fpath) ? 'directory' : 'file',
-                                'size' => is_dir($fpath) ? 0 : filesize($fpath),
-                                'modified' => date('Y-m-d H:i:s', filemtime($fpath))
-                            ];
-                        }
-                        $result['content'][] = ['type' => 'text', 'text' => json_encode($info, JSON_PRETTY_PRINT)];
-                    }
-                }
-            } elseif ($tool === 'read_file') {
-                if (!has_mcp_permission('folders', $resolved_path, 'read')) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to folder containing this file."];
-                } else {
-                    if (!is_file($resolved_path)) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "Error: Path is not a file."];
-                    } else {
-                        $content = file_get_contents($resolved_path);
-                        $result['content'][] = ['type' => 'text', 'text' => $content];
-                    }
-                }
-            } elseif ($tool === 'write_file') {
-                if (!has_mcp_permission('folders', $resolved_path, 'write')) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file."];
-                } else {
-                    $content = $arguments['content'] ?? '';
-                    if (file_put_contents($resolved_path, $content) === false) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to write to file."];
-                    } else {
-                        $result['content'][] = ['type' => 'text', 'text' => "Success: File written successfully."];
-                    }
-                }
-            } elseif ($tool === 'delete_file') {
-                if (!has_mcp_permission('folders', $resolved_path, 'write')) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder containing this file/directory."];
-                } else {
-                    if (is_dir($resolved_path)) {
-                        $ok = @rmdir($resolved_path);
-                    } else {
-                        $ok = @unlink($resolved_path);
-                    }
-                    if (!$ok) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "Error: Failed to delete path."];
-                    } else {
-                        $result['content'][] = ['type' => 'text', 'text' => "Success: Path deleted successfully."];
-                    }
-                }
-            } else {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
-            }
-            }
-        }
+        $result = execute_fm_tool($tool, $arguments);
         echo json_encode(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result]);
         exit;
     }
@@ -2267,9 +2297,22 @@ window.switchApp = function(url) {
                         </div>
                     </div>
 
+                    <!-- REST API (recommended - no local process needed) -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">REST API (recommended &mdash; works with any AI agent, no local install)</h4>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Single HTTP call, <span style="color:#fff;font-family:monospace;">X-API-KEY</span> header, plain JSON response. No bridge script, no MCP client required.</p>
+                        <pre style="background: #000; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.7rem; color: #fff; overflow-x: auto; white-space: pre; margin: 0;">curl -X POST "<span x-text="mcpBaseUrl"></span>?action=api" \
+  -H "X-API-KEY: <?php echo htmlspecialchars(API_KEY); ?>" \
+  --data-urlencode "tool=list_directory" \
+  --data-urlencode "path=/"</pre>
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.35rem;">
+                            <span style="color:#fff;font-family:monospace;">tool</span> = <span style="color:#fff;font-family:monospace;">list_directory</span> | <span style="color:#fff;font-family:monospace;">read_file</span> | <span style="color:#fff;font-family:monospace;">write_file</span> | <span style="color:#fff;font-family:monospace;">delete_file</span> | <span style="color:#fff;font-family:monospace;">get_server_docs</span> &mdash; params: <span style="color:#fff;font-family:monospace;">path</span>, <span style="color:#fff;font-family:monospace;">content</span> (write_file only). Works with GET or POST.
+                        </span>
+                    </div>
+
                     <!-- Setup Instructions -->
                     <div>
-                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">MCP Client Config (Claude Desktop / Cursor)</h4>
                         <div style="margin-bottom: 0.75rem;">
                             <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Publicly accessible server URL (must be reachable from wherever your AI client runs — not localhost/internal IP unless the client runs on this same machine/network)</label>
                             <input type="text" x-model="mcpBaseUrl" @input="onMcpBaseUrlChange" placeholder="https://your-public-domain.com/serverluxe/fm.php" style="width: 100%; padding: 0.5rem 0.75rem; background: #000; border: 1px solid var(--border); border-radius: var(--radius-md); color: #fff; font-family: monospace; font-size: 0.75rem;">

@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.3.9');
+define('VERSION', '1.4.0');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -401,6 +401,144 @@ function apply_update() {
     return true;
 }
 
+// Shared database tool executor, used by both the MCP JSON-RPC endpoint
+// and the plain REST API endpoint below.
+function execute_db_tool($tool, $arguments) {
+    $result = ['content' => [], 'isError' => false];
+
+    if ($tool === 'get_server_docs') {
+        $docsFile = __DIR__ . '/mcp_docs.md';
+        if (file_exists($docsFile)) {
+            $result['content'][] = ['type' => 'text', 'text' => file_get_contents($docsFile)];
+        } else {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => 'Documentation file mcp_docs.md not found.'];
+        }
+        return $result;
+    }
+
+    if ($tool === 'query_database') {
+        $database = $arguments['database'] ?? '';
+        $query = $arguments['query'] ?? '';
+        $is_write = !preg_match('/^(SELECT|SHOW|DESCRIBE|EXPLAIN)\s+/i', trim($query));
+
+        if (!has_mcp_permission('databases', $database, 'read')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+        } elseif ($is_write && !has_mcp_permission('databases', $database, 'write')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to database '{$database}'."];
+        } else {
+            $config = [
+                'host' => DEFAULT_HOST,
+                'port' => DEFAULT_PORT,
+                'username' => DEFAULT_USER,
+                'password' => DEFAULT_PASS,
+                'database' => $database
+            ];
+            $conn = connect_with_config($config, true);
+            if (!($conn instanceof PDO)) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+            } else {
+                try {
+                    $stmt = $conn->prepare($query);
+                    $stmt->execute();
+                    if (!$is_write) {
+                        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    } else {
+                        $data = ['affected_rows' => $stmt->rowCount()];
+                    }
+                    $result['content'][] = ['type' => 'text', 'text' => json_encode($data, JSON_PRETTY_PRINT)];
+                } catch (PDOException $e) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                }
+            }
+        }
+    } elseif ($tool === 'list_tables') {
+        $database = $arguments['database'] ?? '';
+        if (!has_mcp_permission('databases', $database, 'read')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+        } else {
+            $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
+            $conn = connect_with_config($config, true);
+            if (!($conn instanceof PDO)) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+            } else {
+                try {
+                    $stmt = $conn->query("SHOW TABLES");
+                    $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                    $result['content'][] = ['type' => 'text', 'text' => json_encode($tables)];
+                } catch (PDOException $e) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                }
+            }
+        }
+    } elseif ($tool === 'describe_table') {
+        $database = $arguments['database'] ?? '';
+        $table = $arguments['table'] ?? '';
+        if (!has_mcp_permission('databases', $database, 'read')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
+        } else {
+            $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
+            $conn = connect_with_config($config, true);
+            if (!($conn instanceof PDO)) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
+            } else {
+                try {
+                    $stmt = $conn->query("DESCRIBE `$table`");
+                    $cols = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $result['content'][] = ['type' => 'text', 'text' => json_encode($cols, JSON_PRETTY_PRINT)];
+                } catch (PDOException $e) {
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
+                }
+            }
+        }
+    } else {
+        $result['isError'] = true;
+        $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
+    }
+
+    return $result;
+}
+
+// Plain REST API endpoint for AI agents that can't spawn a local MCP bridge
+// process — a single HTTP call, no stdio/JSON-RPC required.
+// GET/POST ?action=api&tool=query_database|list_tables|describe_table|get_server_docs
+// Auth: X-API-KEY header (or api_key param). Params: database, query, table.
+if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'api') {
+    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
+    header('Content-Type: application/json');
+    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+        header('HTTP/1.1 401 Unauthorized');
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+
+    $tool = $_REQUEST['tool'] ?? '';
+    $arguments = [
+        'database' => $_REQUEST['database'] ?? '',
+        'query' => $_REQUEST['query'] ?? '',
+        'table' => $_REQUEST['table'] ?? ''
+    ];
+    $result = execute_db_tool($tool, $arguments);
+
+    if ($result['isError']) {
+        header('HTTP/1.1 400 Bad Request');
+        echo json_encode(['success' => false, 'error' => $result['content'][0]['text'] ?? 'Unknown error']);
+    } else {
+        echo json_encode(['success' => true, 'result' => $result['content'][0]['text'] ?? '']);
+    }
+    exit;
+}
+
 // MCP API endpoint
 if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
     $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
@@ -480,105 +618,7 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
     if ($method === 'tools/call') {
         $tool = $params['name'] ?? '';
         $arguments = $params['arguments'] ?? [];
-        $result = ['content' => [], 'isError' => false];
-        
-        if ($tool === 'get_server_docs') {
-            $docsFile = __DIR__ . '/mcp_docs.md';
-            if (file_exists($docsFile)) {
-                $result['content'][] = ['type' => 'text', 'text' => file_get_contents($docsFile)];
-            } else {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => 'Documentation file mcp_docs.md not found.'];
-            }
-        } elseif ($tool === 'query_database') {
-            $database = $arguments['database'] ?? '';
-            $query = $arguments['query'] ?? '';
-            $is_write = !preg_match('/^(SELECT|SHOW|DESCRIBE|EXPLAIN)\s+/i', trim($query));
-            
-            if (!has_mcp_permission('databases', $database, 'read')) {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
-            } elseif ($is_write && !has_mcp_permission('databases', $database, 'write')) {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to database '{$database}'."];
-            } else {
-                $config = [
-                    'host' => DEFAULT_HOST,
-                    'port' => DEFAULT_PORT,
-                    'username' => DEFAULT_USER,
-                    'password' => DEFAULT_PASS,
-                    'database' => $database
-                ];
-                $conn = connect_with_config($config, true);
-                if (!($conn instanceof PDO)) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
-                } else {
-                    try {
-                        $stmt = $conn->prepare($query);
-                        $stmt->execute();
-                        $data = [];
-                        if (!$is_write) {
-                            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                        } else {
-                            $data = ['affected_rows' => $stmt->rowCount()];
-                        }
-                        $result['content'][] = ['type' => 'text', 'text' => json_encode($data, JSON_PRETTY_PRINT)];
-                    } catch (PDOException $e) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
-                    }
-                }
-            }
-        } elseif ($tool === 'list_tables') {
-            $database = $arguments['database'] ?? '';
-            if (!has_mcp_permission('databases', $database, 'read')) {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
-            } else {
-                $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
-                $conn = connect_with_config($config, true);
-                if (!($conn instanceof PDO)) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
-                } else {
-                    try {
-                        $stmt = $conn->query("SHOW TABLES");
-                        $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                        $result['content'][] = ['type' => 'text', 'text' => json_encode($tables)];
-                    } catch (PDOException $e) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
-                    }
-                }
-            }
-        } elseif ($tool === 'describe_table') {
-            $database = $arguments['database'] ?? '';
-            $table = $arguments['table'] ?? '';
-            if (!has_mcp_permission('databases', $database, 'read')) {
-                $result['isError'] = true;
-                $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Read access to database '{$database}'."];
-            } else {
-                $config = ['host' => DEFAULT_HOST, 'port' => DEFAULT_PORT, 'username' => DEFAULT_USER, 'password' => DEFAULT_PASS, 'database' => $database];
-                $conn = connect_with_config($config, true);
-                if (!($conn instanceof PDO)) {
-                    $result['isError'] = true;
-                    $result['content'][] = ['type' => 'text', 'text' => "Connection failed: " . $conn];
-                } else {
-                    try {
-                        $stmt = $conn->query("DESCRIBE `$table`");
-                        $cols = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                        $result['content'][] = ['type' => 'text', 'text' => json_encode($cols, JSON_PRETTY_PRINT)];
-                    } catch (PDOException $e) {
-                        $result['isError'] = true;
-                        $result['content'][] = ['type' => 'text', 'text' => "SQL Error: " . $e->getMessage()];
-                    }
-                }
-            }
-        } else {
-            $result['isError'] = true;
-            $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
-        }
+        $result = execute_db_tool($tool, $arguments);
         echo json_encode(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result]);
         exit;
     }
@@ -2390,9 +2430,22 @@ if ($isConnected) {
                                 </div>
                             </div>
 
+                            <!-- REST API (recommended - no local process needed) -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">REST API (recommended &mdash; works with any AI agent, no local install)</h4>
+                                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Single HTTP call, <span style="color:#fff;font-family:monospace;">X-API-KEY</span> header, plain JSON response. No bridge script, no MCP client required.</p>
+                                <pre style="background: #000; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.7rem; color: #fff; overflow-x: auto; white-space: pre; margin: 0;">curl -X POST "<span x-text="mcpBaseUrl"></span>?action=api" \
+  -H "X-API-KEY: <?php echo htmlspecialchars(API_KEY); ?>" \
+  --data-urlencode "tool=list_tables" \
+  --data-urlencode "database=your_db_name"</pre>
+                                <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.35rem;">
+                                    <span style="color:#fff;font-family:monospace;">tool</span> = <span style="color:#fff;font-family:monospace;">query_database</span> | <span style="color:#fff;font-family:monospace;">list_tables</span> | <span style="color:#fff;font-family:monospace;">describe_table</span> | <span style="color:#fff;font-family:monospace;">get_server_docs</span> &mdash; params: <span style="color:#fff;font-family:monospace;">database</span>, <span style="color:#fff;font-family:monospace;">query</span>, <span style="color:#fff;font-family:monospace;">table</span>. Works with GET or POST.
+                                </span>
+                            </div>
+
                             <!-- Setup Instructions -->
                             <div>
-                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">AI Client Config (Claude Desktop / Cursor)</h4>
+                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">MCP Client Config (Claude Desktop / Cursor)</h4>
                                 <div style="margin-bottom: 0.75rem;">
                                     <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Publicly accessible server URL (must be reachable from wherever your AI client runs — not localhost/internal IP unless the client runs on this same machine/network)</label>
                                     <input type="text" x-model="mcpBaseUrl" @input="onMcpBaseUrlChange" placeholder="https://your-public-domain.com/serverluxe/db.php" style="width: 100%; padding: 0.5rem 0.75rem; background: #000; border: 1px solid var(--border); border-radius: var(--radius-md); color: #fff; font-family: monospace; font-size: 0.75rem;">
