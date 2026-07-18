@@ -48,7 +48,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.3.8');
+define('VERSION', '1.3.9');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -2397,6 +2397,19 @@ if ($isConnected) {
                                     <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Publicly accessible server URL (must be reachable from wherever your AI client runs — not localhost/internal IP unless the client runs on this same machine/network)</label>
                                     <input type="text" x-model="mcpBaseUrl" @input="onMcpBaseUrlChange" placeholder="https://your-public-domain.com/serverluxe/db.php" style="width: 100%; padding: 0.5rem 0.75rem; background: #000; border: 1px solid var(--border); border-radius: var(--radius-md); color: #fff; font-family: monospace; font-size: 0.75rem;">
                                 </div>
+                                <div style="margin-bottom: 0.75rem;">
+                                    <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Step 1 &mdash; download <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> on the machine running your AI client (Claude Desktop / Cursor), not on this server:</label>
+                                    <div style="background: #000; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.7rem; color: #fff; overflow-x: auto; margin-bottom: 0.35rem;">
+                                        <span style="color: var(--text-secondary);"># macOS / Linux</span><br>
+                                        mkdir -p ~/.serverluxe &amp;&amp; curl -fsSL <span x-text="mcpBridgeDownloadUrl"></span> -o ~/.serverluxe/mcp-bridge.js
+                                    </div>
+                                    <div style="background: #000; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.7rem; color: #fff; overflow-x: auto;">
+                                        <span style="color: var(--text-secondary);"># Windows (PowerShell)</span><br>
+                                        mkdir $env:USERPROFILE\.serverluxe -Force; iwr <span x-text="mcpBridgeDownloadUrl"></span> -OutFile $env:USERPROFILE\.serverluxe\mcp-bridge.js
+                                    </div>
+                                    <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.35rem;">Or <a :href="mcpBridgeDownloadUrl" target="_blank" style="color: var(--accent); font-weight: 600;">download mcp-bridge.js directly</a> and save it to that folder yourself.</span>
+                                </div>
+                                <label style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Step 2 &mdash; add this to your AI client's MCP config:</label>
                                     <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
                                         <button @click="copyMcpConfig" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.7rem; color: var(--accent); border-color: rgba(34,211,238,0.3);">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -2407,7 +2420,7 @@ if ($isConnected) {
                                     <pre x-ref="mcpConfigPre" x-text="mcpConfigJson" style="margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
                                 </div>
                                 <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
-                                    Replace <span style="color:#fff;font-family:monospace;">/absolute/path/to/mcp-bridge.js</span> with the path to <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> <strong>on the machine running your AI client</strong> (download it and copy it there — it must be a local path, not a path on this server). <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a> &mdash; your AI can also call the <code style="color:#fff;">get_server_docs</code> tool for in-protocol documentation.
+                                    Paste this JSON as-is &mdash; no editing needed, it finds <span style="color:#fff;font-family:monospace;">mcp-bridge.js</span> in your home folder automatically on macOS, Linux, and Windows. <a href="mcp_docs.md" target="_blank" style="color: var(--accent); font-weight: 600;">Full MCP Docs</a> &mdash; your AI can also call the <code style="color:#fff;">get_server_docs</code> tool for in-protocol documentation.
                                 </span>
                             </div>
 
@@ -2619,13 +2632,21 @@ if ($isConnected) {
                     }
                 },
 
+                get mcpBridgeDownloadUrl() {
+                    return this.mcpBaseUrl.replace(/\/[^\/]*$/, '/mcp-bridge.js');
+                },
                 get mcpConfigJson() {
-                    const bridgePath = '/absolute/path/to/mcp-bridge.js';
+                    // Resolves ~/.serverluxe/mcp-bridge.js via os.homedir() at spawn time so the
+                    // config needs no manual path editing on macOS, Linux, or Windows.
+                    const launcher = "const{join}=require('path');const{homedir}=require('os');" +
+                        "require('child_process').spawn(process.execPath," +
+                        "[join(homedir(),'.serverluxe','mcp-bridge.js'),...process.argv.slice(1)]," +
+                        "{stdio:'inherit'}).on('exit',process.exit);";
                     return JSON.stringify({
                         mcpServers: {
                             serverluxe: {
                                 command: 'node',
-                                args: [bridgePath, '--url', this.mcpBaseUrl, '--key', '<?php echo addslashes(API_KEY); ?>']
+                                args: ['-e', launcher, '--', '--url', this.mcpBaseUrl, '--key', '<?php echo addslashes(API_KEY); ?>']
                             }
                         }
                     }, null, 2);
