@@ -5,6 +5,8 @@
  */
 
 session_start();
+mb_internal_encoding('UTF-8');
+mb_http_output('UTF-8');
 
 // CORS Support for Mobile App - FIXED: Exact origin matching instead of substring matching
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -48,7 +50,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.4.0');
+define('VERSION', '1.4.1');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -218,6 +220,8 @@ function connect_with_config($config, $silent = false) {
             PDO::ATTR_ORACLE_NULLS => PDO::NULL_NATURAL,
             PDO::ATTR_TIMEOUT => 5, // Fast failure for auth checks
         ]);
+        @$pdo->exec("SET NAMES utf8mb4");
+        @$pdo->exec("SET CHARACTER SET utf8mb4");
         return $pdo;
     } catch (PDOException $e) {
         if (!$silent) error_log("[SQLuxe] DB Connection Failed: " . $e->getMessage());
@@ -246,7 +250,7 @@ function save_mcp_config($config) {
     if (file_exists($config_file)) {
         @chmod($config_file, 0666);
     }
-    $res = file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+    $res = @file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
     if ($res !== false) {
         @chmod($config_file, 0666);
     }
@@ -657,8 +661,7 @@ if (isset($_SESSION['db_config']) || is_api_request()) {
         $res = save_mcp_config($input);
         header('Content-Type: application/json');
         if ($res === false) {
-            header('HTTP/1.1 500 Internal Server Error');
-            echo json_encode(['error' => 'Failed to write mcp_config.json. Check directory write permissions on the server.']);
+            echo json_encode(['error' => 'Failed to write mcp_config.json. Please check directory write permissions on the server.']);
         } else {
             echo json_encode(['success' => true]);
         }
@@ -1161,50 +1164,168 @@ if ((isset($_SESSION['db_config']) || is_api_request()) && isset($_GET['action']
     }
 }
 
+function split_sql_queries($sql) {
+    if (substr($sql, 0, 3) === "\xEF\xBB\xBF") {
+        $sql = substr($sql, 3);
+    }
+    
+    $queries = [];
+    $length = strlen($sql);
+    $current = '';
+    $inString = false;
+    $stringChar = '';
+    $inComment = false;
+    $inBlockComment = false;
+    
+    for ($i = 0; $i < $length; $i++) {
+        $char = $sql[$i];
+        $next = ($i + 1 < $length) ? $sql[$i + 1] : '';
+
+        if ($inComment) {
+            if ($char === "\n" || $char === "\r") {
+                $inComment = false;
+            }
+            continue;
+        }
+
+        if ($inBlockComment) {
+            if ($char === '*' && $next === '/') {
+                $inBlockComment = false;
+                $i++;
+            }
+            continue;
+        }
+
+        if ($inString) {
+            $current .= $char;
+            if ($char === '\\') {
+                if ($i + 1 < $length) {
+                    $i++;
+                    $current .= $sql[$i];
+                }
+            } elseif ($char === $stringChar) {
+                if ($next === $stringChar) {
+                    $i++;
+                    $current .= $sql[$i];
+                } else {
+                    $inString = false;
+                    $stringChar = '';
+                }
+            }
+            continue;
+        }
+
+        if ($char === '#' || ($char === '-' && $next === '-' && ($i + 2 >= $length || ctype_space($sql[$i + 2])))) {
+            $inComment = true;
+            continue;
+        }
+
+        if ($char === '/' && $next === '*') {
+            $inBlockComment = true;
+            $i++;
+            continue;
+        }
+
+        if ($char === "'" || $char === '"' || $char === '`') {
+            $inString = true;
+            $stringChar = $char;
+            $current .= $char;
+            continue;
+        }
+
+        if ($char === ';') {
+            $trimmed = trim($current);
+            if ($trimmed !== '') {
+                $queries[] = $trimmed;
+            }
+            $current = '';
+            continue;
+        }
+
+        $current .= $char;
+    }
+
+    $trimmed = trim($current);
+    if ($trimmed !== '') {
+        $queries[] = $trimmed;
+    }
+
+    return $queries;
+}
+
 // Handle SQL Import
 if ((isset($_SESSION['db_config']) || is_api_request()) && isset($_POST['action']) && $_POST['action'] === 'import_sql' && isset($_FILES['sql_file'])) {
     validate_csrf();
     validate_write_access();
-    ob_start();
+    set_time_limit(300);
+    ini_set('memory_limit', '512M');
+    while (ob_get_level()) { ob_end_clean(); }
+    header('Content-Type: application/json');
+
     $db = get_db_connection();
-    if ($db instanceof PDO) {
-        try {
-            if ($_FILES['sql_file']['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception("File upload failed with error code: " . $_FILES['sql_file']['error']);
-            }
+    if (!($db instanceof PDO)) {
+        echo json_encode(['error' => is_string($db) ? $db : "Database connection not available."]);
+        exit;
+    }
 
-            $content = file_get_contents($_FILES['sql_file']['tmp_name']);
-            // Detect GZIP (Magic bytes: 1f 8b)
-            if (substr($content, 0, 2) === "\x1f\x8b") {
-                if (!function_exists('gzdecode')) {
-                    throw new Exception("GZIP decoding not supported on this server.");
+    try {
+        if ($_FILES['sql_file']['error'] !== UPLOAD_ERR_OK) {
+            $uploadErrors = [
+                UPLOAD_ERR_INI_SIZE   => "Uploaded file exceeds upload_max_filesize in php.ini",
+                UPLOAD_ERR_FORM_SIZE  => "Uploaded file exceeds MAX_FILE_SIZE directive",
+                UPLOAD_ERR_PARTIAL    => "File was only partially uploaded",
+                UPLOAD_ERR_NO_FILE    => "No file was uploaded",
+                UPLOAD_ERR_NO_TMP_DIR => "Missing temporary directory on server",
+                UPLOAD_ERR_CANT_WRITE => "Failed to write uploaded file to disk",
+                UPLOAD_ERR_EXTENSION  => "A PHP extension stopped the file upload"
+            ];
+            $msg = $uploadErrors[$_FILES['sql_file']['error']] ?? ("Upload error code: " . $_FILES['sql_file']['error']);
+            throw new Exception($msg);
+        }
+
+        $content = file_get_contents($_FILES['sql_file']['tmp_name']);
+        if ($content === false || strlen($content) === 0) {
+            throw new Exception("Uploaded SQL file is empty or unreadable.");
+        }
+
+        // Detect GZIP (Magic bytes: 1f 8b)
+        if (substr($content, 0, 2) === "\x1f\x8b") {
+            if (!function_exists('gzdecode')) {
+                throw new Exception("GZIP decoding not supported on this server (gzdecode missing).");
+            }
+            $decompressed = @gzdecode($content);
+            if ($decompressed === false) {
+                throw new Exception("Failed to decompress GZIP file.");
+            }
+            $content = $decompressed;
+        }
+
+        $db->exec("SET FOREIGN_KEY_CHECKS=0");
+        $db->exec("SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO'");
+
+        $queries = split_sql_queries($content);
+        $count = 0;
+        foreach ($queries as $q) {
+            $q = trim($q);
+            if ($q !== '') {
+                if (preg_match('/^DELIMITER\s+/i', $q)) {
+                    continue;
                 }
-                $content = gzdecode($content);
-            }
-
-            $db->exec("SET FOREIGN_KEY_CHECKS=0");
-            
-            // Basic SQL splitting by semicolon followed by newline
-            $queries = preg_split("/;[\r\n]+/", $content);
-            $count = 0;
-            foreach ($queries as $q) {
-                $q = trim($q);
-                if ($q) {
+                try {
                     $db->exec($q);
                     $count++;
+                } catch (PDOException $pe) {
+                    throw new Exception("Error in query #" . ($count + 1) . ": " . $pe->getMessage() . "\nNear: " . substr($q, 0, 150));
                 }
             }
-            
-            $db->exec("SET FOREIGN_KEY_CHECKS=1");
-            ob_clean();
-            echo json_encode(['success' => true, 'count' => $count]);
-            exit;
-        } catch (Exception $e) {
-            header('Content-Type: application/json', true, 500);
-            ob_clean();
-            echo json_encode(['error' => $e->getMessage()]);
-            exit;
         }
+
+        $db->exec("SET FOREIGN_KEY_CHECKS=1");
+        echo json_encode(['success' => true, 'count' => $count]);
+        exit;
+    } catch (Exception $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+        exit;
     }
 }
 
@@ -1438,7 +1559,8 @@ if ($isConnected) {
         * { scrollbar-width: thin; scrollbar-color: var(--bg-elevated) var(--bg-deep); }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Outfit', sans-serif; background-color: var(--bg-deep); color: var(--text-primary); line-height: 1.5; height: 100vh; overflow: hidden; }
+        body { font-family: 'Outfit', 'Inter', 'Segoe UI', 'Noto Sans Arabic', Tahoma, Arial, sans-serif; background-color: var(--bg-deep); color: var(--text-primary); line-height: 1.5; height: 100vh; overflow: hidden; }
+        [dir="auto"], input, textarea, td, select, th { unicode-bidi: plaintext; }
 
         .app-container { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 64px 1fr; grid-template-areas: "sidebar header" "sidebar main"; height: 100vh; }
         .toggle-btn { display: none; }
@@ -2897,14 +3019,21 @@ if ($isConnected) {
                     fd.append('csrf_token', this.csrfToken);
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
-                        const data = await res.json();
+                        const text = await res.text();
+                        let data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            alert('Server Error: ' + (text ? text.replace(/<[^>]+>/g, '').trim().substring(0, 300) : res.statusText));
+                            return;
+                        }
                         if (data.success) {
                             alert('MCP Configuration saved successfully!');
                         } else {
-                            alert('Error: ' + data.error);
+                            alert('Error: ' + (data.error || 'Failed to save configuration.'));
                         }
                     } catch(e) {
-                        alert('Failed to save configuration.');
+                        alert('Failed to save configuration: ' + (e.message || e));
                     } finally {
                         this.loading = false;
                     }
@@ -3179,19 +3308,27 @@ if ($isConnected) {
                     const fd = new FormData();
                     fd.append('action', 'import_sql');
                     fd.append('sql_file', file);
+                    fd.append('csrf_token', this.csrfToken);
                     this.loading = true;
 
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
-                        const data = await res.json();
+                        const text = await res.text();
+                        let data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            alert('Import Server Error: ' + (text ? text.replace(/<[^>]+>/g, '').trim().substring(0, 300) : res.statusText));
+                            return;
+                        }
                         if (data.success) {
                             alert(`Success! Executed ${data.count} SQL commands.`);
                             location.reload();
                         } else {
-                            alert('Import Error: ' + data.error);
+                            alert('Import Error: ' + (data.error || 'Unknown error occurred.'));
                         }
                     } catch (e) {
-                        alert('Import failed. Check file format.');
+                        alert('Import failed: ' + (e.message || e));
                     } finally {
                         this.loading = false;
                         event.target.value = '';

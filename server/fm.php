@@ -5,6 +5,8 @@
  */
 
 session_start();
+mb_internal_encoding('UTF-8');
+mb_http_output('UTF-8');
 
 // CORS Support for Mobile App - FIXED: Exact origin matching instead of substring matching
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -49,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.4.0');
+define('VERSION', '1.4.1');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -264,7 +266,7 @@ function save_mcp_config($config) {
     if (file_exists($config_file)) {
         @chmod($config_file, 0666);
     }
-    $res = file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
+    $res = @file_put_contents($config_file, json_encode($config, JSON_PRETTY_PRINT));
     if ($res !== false) {
         @chmod($config_file, 0666);
     }
@@ -677,8 +679,7 @@ if (isset($_SESSION['fm_authenticated']) || is_api_request()) {
         $res = save_mcp_config($input);
         header('Content-Type: application/json');
         if ($res === false) {
-            header('HTTP/1.1 500 Internal Server Error');
-            echo json_encode(['error' => 'Failed to write mcp_config.json. Check directory write permissions on the server.']);
+            echo json_encode(['error' => 'Failed to write mcp_config.json. Please check directory write permissions on the server.']);
         } else {
             echo json_encode(['success' => true]);
         }
@@ -983,7 +984,8 @@ window.switchApp = function(url) {
         * { scrollbar-width: thin; scrollbar-color: var(--bg-elevated) var(--bg-deep); }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Outfit', sans-serif; background-color: var(--bg-deep); color: var(--text-primary); line-height: 1.5; height: 100vh; overflow: hidden; }
+        body { font-family: 'Outfit', 'Inter', 'Segoe UI', 'Noto Sans Arabic', Tahoma, Arial, sans-serif; background-color: var(--bg-deep); color: var(--text-primary); line-height: 1.5; height: 100vh; overflow: hidden; }
+        [dir="auto"], input, textarea, td, select, th { unicode-bidi: plaintext; }
 
         .app-container { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 64px 1fr; grid-template-areas: "sidebar header" "sidebar main"; height: 100vh; }
         .toggle-btn { display: none; }
@@ -1875,14 +1877,21 @@ window.switchApp = function(url) {
                     fd.append('csrf_token', this.csrf_token);
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
-                        const data = await res.json();
+                        const text = await res.text();
+                        let data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            window.uiAlert('Server Error: ' + (text ? text.replace(/<[^>]+>/g, '').trim().substring(0, 300) : res.statusText));
+                            return;
+                        }
                         if (data.success) {
                             window.uiAlert('MCP Configuration saved successfully!');
                         } else {
-                            window.uiAlert('Error: ' + data.error);
+                            window.uiAlert('Error: ' + (data.error || 'Failed to save configuration.'));
                         }
                     } catch(e) {
-                        window.uiAlert('Failed to save configuration.');
+                        window.uiAlert('Failed to save configuration: ' + (e.message || e));
                     } finally {
                         this.loading = false;
                     }

@@ -4,6 +4,16 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.4.1] - 2026-08-08
+### Fixed
+- **MCP Config Saving**: Resolved issue where configuration save requests threw error alerts by suppressing file write warnings and returning clean JSON responses without raw HTTP 500 header breaks.
+- **SQL Import Overhaul**: Fixed missing CSRF token in SQL import requests and replaced basic string splitting with a robust character-by-character SQL parser (`split_sql_queries()`) supporting comments with semicolons, string literals, GZIP decompression, and detailed query failure diagnostics.
+
+### Added
+- **Arabic Text & Bi-Directional (BIDI) Support**: Enforced UTF-8 internal encoding, `SET NAMES utf8mb4` on MySQL connection init, system Arabic font family fallbacks, and CSS `unicode-bidi: plaintext;` for automatic RTL/LTR rendering across inputs, textareas, and data grids in `db.php` and `fm.php`.
+
+---
+
 ## [1.3.5] - 2026-07-16
 ### Added
 - **MCP Docs Link**: Added a "Full MCP Docs" link pointing to `mcp_docs.md` in the AI Client Config help text.
