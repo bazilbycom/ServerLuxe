@@ -279,6 +279,45 @@ function has_mcp_permission($type, $name, $access_type) {
     return !empty($config[$type][$name][$access_type]);
 }
 
+function fetch_remote_url($url) {
+    if (ini_get('allow_url_fopen')) {
+        $opts = [
+            'http' => [
+                'method' => 'GET',
+                'header' => "User-Agent: ServerLuxe-Updater\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n",
+                'timeout' => 12
+            ],
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false
+            ]
+        ];
+        $context = stream_context_create($opts);
+        $res = @file_get_contents($url, false, $context);
+        if ($res !== false && !empty($res)) {
+            return $res;
+        }
+    }
+    
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'ServerLuxe-Updater');
+        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        if ($res !== false && !empty($res)) {
+            return $res;
+        }
+    }
+    
+    return false;
+}
+
 function check_for_updates() {
     $repo = 'bazilbycom/ServerLuxe';
     $branch = 'main';
@@ -304,14 +343,7 @@ function check_for_updates() {
     
     $remote_version = VERSION;
     $http_update_available = false;
-    $opts = [
-        'http' => [
-            'method' => 'GET',
-            'header' => "User-Agent: ServerLuxe-Updater\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n"
-        ]
-    ];
-    $context = stream_context_create($opts);
-    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time(), false, $context);
+    $github_db = fetch_remote_url("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time());
     
     if ($github_db) {
         if (preg_match("/define\('VERSION',\s*'([^']+)'\)/", $github_db, $matches)) {
@@ -338,16 +370,9 @@ function check_for_updates() {
 function apply_update() {
     $repo = 'bazilbycom/ServerLuxe';
     $branch = 'main';
-    $opts = [
-        'http' => [
-            'method' => 'GET',
-            'header' => "User-Agent: ServerLuxe-Updater\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n"
-        ]
-    ];
-    $context = stream_context_create($opts);
     
-    $github_db = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time(), false, $context);
-    $github_fm = @file_get_contents("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php?t=" . time(), false, $context);
+    $github_db = fetch_remote_url("https://raw.githubusercontent.com/{$repo}/{$branch}/server/db.php?t=" . time());
+    $github_fm = fetch_remote_url("https://raw.githubusercontent.com/{$repo}/{$branch}/server/fm.php?t=" . time());
     
     if (!$github_db || !$github_fm) {
         return "Failed to download update files from GitHub.";
@@ -629,12 +654,13 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
 }
 
 // Handle Update Checking & Config API
+if (isset($_GET['action']) && $_GET['action'] === 'check_updates') {
+    header('Content-Type: application/json');
+    echo json_encode(check_for_updates());
+    exit;
+}
+
 if (isset($_SESSION['db_config']) || is_api_request()) {
-    if (isset($_GET['action']) && $_GET['action'] === 'check_updates') {
-        header('Content-Type: application/json');
-        echo json_encode(check_for_updates());
-        exit;
-    }
     if (isset($_POST['action']) && $_POST['action'] === 'apply_update') {
         validate_csrf();
         header('Content-Type: application/json');
@@ -3063,14 +3089,21 @@ if ($isConnected) {
                     this.updateInfo.error = '';
                     try {
                         const res = await fetch('?action=check_updates');
-                        const data = await res.json();
+                        const text = await res.text();
+                        let data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            this.updateInfo.error = 'Server Error: ' + (text ? text.replace(/<[^>]+>/g, '').trim().substring(0, 150) : res.statusText);
+                            return;
+                        }
                         this.updateInfo.checked = true;
                         this.updateInfo.available = data.update_available;
                         this.updateInfo.current = data.current_version;
                         this.updateInfo.latest = data.latest_version;
                         this.updateInfo.commitsBehind = data.commits_behind;
                     } catch(e) {
-                        this.updateInfo.error = 'Failed to check for updates.';
+                        this.updateInfo.error = 'Failed to check for updates: ' + (e.message || e);
                     } finally {
                         this.updateInfo.loading = false;
                     }
