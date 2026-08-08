@@ -51,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.4.1');
+define('VERSION', '1.4.2');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');

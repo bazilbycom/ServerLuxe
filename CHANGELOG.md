@@ -4,6 +4,14 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.4.2] - 2026-08-08
+### Fixed
+- **WAF 403 Forbidden Bypass**: Implemented Base64 payload encoding (`config_b64`) for `save_mcp_config` requests to prevent Web Application Firewalls (ModSecurity / cPanel WAF) from false-flagging JSON permission structures.
+- **Web Server Response Interception Fix**: Removed HTTP 403 status code overrides from authentication & CSRF validation responses so LiteSpeed, Apache, and Nginx servers do not replace JSON error output with HTML error pages.
+- **Global Update Checking**: Unlocked `?action=check_updates` and added cURL / SSL verify fallbacks to ensure version checking succeeds across all server configurations.
+
+---
+
 ## [1.4.1] - 2026-08-08
 ### Fixed
 - **MCP Config Saving**: Resolved issue where configuration save requests threw error alerts by suppressing file write warnings and returning clean JSON responses without raw HTTP 500 header breaks.
