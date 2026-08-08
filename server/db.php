@@ -110,7 +110,7 @@ function validate_csrf() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
         if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
-            header('Content-Type: application/json', true, 403);
+            header('Content-Type: application/json');
             echo json_encode(['error' => "CSRF token mismatch or session expired."]);
             exit;
         }
@@ -119,7 +119,7 @@ function validate_csrf() {
 
 function validate_write_access() {
     if (!empty($_SESSION['read_only'])) {
-        header('Content-Type: application/json', true, 403);
+        header('Content-Type: application/json');
         echo json_encode(['error' => "Security Exception: System is in READ-ONLY mode. Disable to make changes."]);
         exit;
     }
@@ -683,7 +683,12 @@ if (isset($_SESSION['db_config']) || is_api_request()) {
     }
     if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
         validate_csrf();
-        $input = json_decode($_POST['config'] ?? '{}', true);
+        $b64 = $_POST['config_b64'] ?? '';
+        if (!empty($b64)) {
+            $input = json_decode(base64_decode($b64), true);
+        } else {
+            $input = json_decode($_POST['config'] ?? '{}', true);
+        }
         $res = save_mcp_config($input);
         header('Content-Type: application/json');
         if ($res === false) {
@@ -3039,9 +3044,12 @@ if ($isConnected) {
 
                 async saveMcpConfig() {
                     this.loading = true;
+                    const jsonStr = JSON.stringify(this.mcpConfig);
+                    const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
                     const fd = new FormData();
                     fd.append('action', 'save_mcp_config');
-                    fd.append('config', JSON.stringify(this.mcpConfig));
+                    fd.append('config_b64', b64);
+                    fd.append('config', jsonStr);
                     fd.append('csrf_token', this.csrfToken);
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
