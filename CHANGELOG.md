@@ -4,6 +4,13 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.4.3] - 2026-09-12
+### Fixed
+- **CSRF Token Validation Fix in FileLuxe (`fm.php`)**: Fixed issue where `validate_csrf_token()` was called with `if (!validate_csrf_token())` in AJAX file actions handler; since `validate_csrf_token()` returns `void` on success and exits on failure, the negation condition was always truthy and blocked file operations (delete, rename, etc.) with "Invalid CSRF token".
+- **WAF 403 False-Positive Fix**: Completely eliminated the unencoded `config` JSON parameter from `save_mcp_config` POST requests so host Web Application Firewalls (ModSecurity / LiteSpeed / cPanel) see only clean Base64 data (`config_b64`) and no longer block permission saves with 403 Forbidden.
+
+---
+
 ## [1.4.2] - 2026-08-08
 ### Fixed
 - **WAF 403 Forbidden Bypass**: Implemented Base64 payload encoding (`config_b64`) for `save_mcp_config` requests to prevent Web Application Firewalls (ModSecurity / cPanel WAF) from false-flagging JSON permission structures.

@@ -51,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.4.2');
+define('VERSION', '1.4.3');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -1907,7 +1907,6 @@ window.switchApp = function(url) {
                     const fd = new FormData();
                     fd.append('action', 'save_mcp_config');
                     fd.append('config_b64', b64);
-                    fd.append('config', jsonStr);
                     fd.append('csrf_token', this.csrf_token);
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
@@ -2549,10 +2548,7 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
         header('Content-Type: application/json');
 
         // SECURITY: CSRF validation for state-changing operations
-        if (!validate_csrf_token()) {
-            echo json_encode(['error' => 'Invalid CSRF token']);
-            exit;
-        }
+        validate_csrf_token();
 
         $action = $_POST['action'];
         switch($action) {

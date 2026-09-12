@@ -50,7 +50,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.4.2');
+define('VERSION', '1.4.3');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -3049,7 +3049,6 @@ if ($isConnected) {
                     const fd = new FormData();
                     fd.append('action', 'save_mcp_config');
                     fd.append('config_b64', b64);
-                    fd.append('config', jsonStr);
                     fd.append('csrf_token', this.csrfToken);
                     try {
                         const res = await fetch('', { method: 'POST', body: fd });
