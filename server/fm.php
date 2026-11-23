@@ -51,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.5.2');
+define('VERSION', '1.5.3');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -1861,8 +1861,8 @@ window.switchApp = function(url) {
                         </div>
                     </template>
                     <template x-if="pathEditing">
-                        <form @submit.prevent="gotoPath()" class="flex items-center gap-1" style="flex: 1; min-width: 0; max-width: 650px;">
-                            <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                        <form @submit.prevent="gotoPath()" class="flex items-center gap-1" style="flex: 1 1 auto; min-width: 0; width: 100%; max-width: 650px;">
+                            <div style="position: relative; flex: 1 1 auto; min-width: 0; width: 100%; display: flex; align-items: center;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" style="position: absolute; left: 10px; pointer-events: none;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                 <input 
                                     type="text" 
@@ -1870,11 +1870,11 @@ window.switchApp = function(url) {
                                     x-model="pathInput" 
                                     @keydown.escape.prevent="cancelPathEdit()"
                                     placeholder="Enter path to folder or file (e.g. /var/www, src/index.php, ..)" 
-                                    style="width: 100%; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 4px 10px 4px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none; box-shadow: 0 0 10px rgba(34, 211, 238, 0.15);"
+                                    style="width: 100%; min-width: 0; box-sizing: border-box; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px 6px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none; box-shadow: 0 0 10px rgba(34, 211, 238, 0.15);"
                                 >
                             </div>
-                            <button type="submit" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
-                            <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="padding: 4px 8px; font-size: 0.85rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" title="Cancel (Esc)">&times;</button>
+                            <button type="submit" class="btn" style="background: var(--accent); color: #000; width: auto !important; margin: 0 !important; flex-shrink: 0; padding: 6px 14px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
+                            <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="width: auto !important; margin: 0 !important; flex-shrink: 0; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" title="Cancel (Esc)">&times;</button>
                         </form>
                     </template>
                 </div>
@@ -1882,18 +1882,15 @@ window.switchApp = function(url) {
             
             <div class="header-right flex items-center gap-4">
                 <?php if (file_exists(DB_FILE)): ?>
-                <a href="<?php echo DB_FILE; ?>" class="btn btn-ghost mobile-hide" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem;" title="Switch to Database">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-                    <span class="btn-text">Switch to Database</span>
+                <a href="<?php echo DB_FILE; ?>" class="btn btn-ghost mobile-hide" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; text-decoration: none; color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem;" title="Switch to Database">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
                 </a>
                 <?php endif; ?>
-                <button @click="openTerminal" class="btn btn-ghost" style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent); font-weight: 600; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(34, 211, 238, 0.25); border-radius: 0.75rem; background: rgba(34, 211, 238, 0.05);" title="Open Terminal">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                    <span class="btn-text">Terminal</span>
+                <button @click="openTerminal" class="btn btn-ghost" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--accent); border: 1px solid rgba(34, 211, 238, 0.25); border-radius: 0.75rem; background: rgba(34, 211, 238, 0.05);" title="Terminal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
                 </button>
-                <a href="?action=logout" class="btn btn-ghost" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--danger); font-weight: 600; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 0.75rem;" title="Disconnect">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    <span class="btn-text">Disconnect</span>
+                <a href="?action=logout" class="btn btn-ghost" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; text-decoration: none; color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 0.75rem;" title="Disconnect">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 </a>
 
                 <a href="https://github.com/bazilbycom/ServerLuxe" target="_blank" class="github-link mobile-hide" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-primary); transition: all 0.2s; margin-left: 0.5rem;" title="GitHub Repository" onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--accent)';" onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(255,255,255,0.1)';">
@@ -1961,7 +1958,53 @@ window.switchApp = function(url) {
                         <div class="spinner animate-spin" style="width: 32px; height: 32px; border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
                     </div>
 
-                    <div x-show="!loading" class="data-table-container" style="overflow-x:auto;">
+                    <!-- File Manager Toolbar: Search Filter & View Switcher -->
+                    <div class="flex items-center justify-between" style="gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <div style="position: relative; flex: 1; min-width: 220px; max-width: 420px; display: flex; align-items: center;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.5" style="position: absolute; left: 12px; pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input 
+                                type="text" 
+                                x-model="searchQuery" 
+                                placeholder="Search files and folders..." 
+                                style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.45rem 2.2rem 0.45rem 2.2rem; color: #fff; font-size: 0.85rem; outline: none; transition: all 0.2s;"
+                                onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 10px rgba(34,211,238,0.15)';"
+                                onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.boxShadow='none';"
+                            >
+                            <button x-show="searchQuery" @click="searchQuery = ''" type="button" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px;">&times;</button>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.25rem;">
+                                <span x-text="filteredFiles.length"></span> <span x-text="filteredFiles.length === 1 ? 'item' : 'items'"></span>
+                                <template x-if="searchQuery">
+                                    <span> (filtered)</span>
+                                </template>
+                            </span>
+                            <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 2px;">
+                                <button 
+                                    type="button" 
+                                    @click="setViewMode('list')" 
+                                    :style="viewMode === 'list' ? 'background: rgba(34,211,238,0.15); color: var(--accent);' : 'color: var(--text-secondary);'" 
+                                    style="border: none; padding: 5px 9px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; transition: all 0.2s;"
+                                    title="List View">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                    <span class="mobile-hide">List</span>
+                                </button>
+                                <button 
+                                    type="button" 
+                                    @click="setViewMode('grid')" 
+                                    :style="viewMode === 'grid' ? 'background: rgba(34,211,238,0.15); color: var(--accent);' : 'color: var(--text-secondary);'" 
+                                    style="border: none; padding: 5px 9px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; transition: all 0.2s;"
+                                    title="Grid View">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                                    <span class="mobile-hide">Grid</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List View Table -->
+                    <div x-show="!loading && viewMode === 'list'" class="data-table-container" style="overflow-x:auto;">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1970,7 +2013,7 @@ window.switchApp = function(url) {
                                     <th>Size</th>
                                     <th>Modified</th>
                                     <th>Perms</th>
-                                    <th style="width: 80px; text-align:center;">Actions</th>
+                                    <th style="width: 90px; text-align:center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1980,15 +2023,18 @@ window.switchApp = function(url) {
                                     </td>
                                     <td colspan="5" style="font-weight: 700; color: var(--text-secondary);">.. (Up)</td>
                                 </tr>
-                                <template x-for="file in files" :key="file.name">
-                                    <tr @click="file.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + file.name : currentPath + '/' + file.name) : inspectFile(file)" 
+                                <template x-for="file in filteredFiles" :key="file.name">
+                                    <tr @click="file.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + file.name : currentPath + '/' + file.name) : (isPreviewable(file) ? previewItem(file) : inspectFile(file))" 
                                         class="clickable-row"
                                         @contextmenu.prevent="openContextMenu($event, file)">
                                         <td style="text-align:center;">
                                             <template x-if="file.type === 'directory'">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                             </template>
-                                            <template x-if="file.type === 'file'">
+                                            <template x-if="file.type === 'file' && isImage(file)">
+                                                <img :src="getRawUrl(file)" loading="lazy" style="width: 24px; height: 24px; object-fit: cover; border-radius: 4px; display: inline-block; vertical-align: middle;">
+                                            </template>
+                                            <template x-if="file.type === 'file' && !isImage(file)">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                                             </template>
                                         </td>
@@ -1996,21 +2042,95 @@ window.switchApp = function(url) {
                                         <td x-text="file.type === 'directory' ? '--' : formatSize(file.size)"></td>
                                         <td x-text="file.date"></td>
                                         <td style="font-family: monospace; opacity: 0.7;" x-text="file.permissions + ' ' + file.owner + ':' + file.group"></td>
-                                        <td style="text-align:center;">
-                                             <button @click.stop="openItemMenu(file)" class="btn btn-ghost" style="padding: 0.4rem; border: none; margin: 0 auto;">
+                                        <td style="text-align:center; white-space: nowrap;">
+                                            <button x-show="file.type === 'file' && isPreviewable(file)" @click.stop="previewItem(file)" class="btn btn-ghost" style="padding: 0.35rem 0.5rem; border: none; color: var(--accent); margin-right: 0.15rem;" title="Preview">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            </button>
+                                            <button @click.stop="openItemMenu(file)" class="btn btn-ghost" style="padding: 0.4rem; border: none; margin: 0 auto;" title="Actions">
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events: none;"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                             </button>
-
                                         </td>
                                     </tr>
                                 </template>
-                                <template x-if="files.length === 0">
+                                <template x-if="filteredFiles.length === 0">
                                     <tr>
-                                        <td colspan="6" style="text-align: center; padding: 2rem; opacity: 0.5;">This directory is empty.</td>
+                                        <td colspan="6" style="text-align: center; padding: 2.5rem; opacity: 0.6; font-size: 0.85rem;" x-text="searchQuery ? 'No matching files or folders found for &quot;' + searchQuery + '&quot;.' : 'This directory is empty.'"></td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Grid View Container -->
+                    <div x-show="!loading && viewMode === 'grid'" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.85rem; margin-top: 0.5rem;">
+                        <!-- Parent (Up) Card -->
+                        <div x-show="currentPath !== '/'" @click="navigateUp()" 
+                            class="grid-item-card" 
+                            style="cursor: pointer; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.15); border-radius: 12px; padding: 0.85rem 0.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; text-align: center; min-height: 130px; transition: all 0.2s;"
+                            onmouseover="this.style.background='rgba(255,255,255,0.06)'; this.style.borderColor='var(--accent)';"
+                            onmouseout="this.style.background='rgba(255,255,255,0.02)'; this.style.borderColor='rgba(255,255,255,0.15)';">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            <span style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary);">.. (Up)</span>
+                        </div>
+
+                        <!-- Grid Cards for Folders & Files -->
+                        <template x-for="file in filteredFiles" :key="file.name">
+                            <div 
+                                @click="file.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + file.name : currentPath + '/' + file.name) : (isPreviewable(file) ? previewItem(file) : inspectFile(file))"
+                                @contextmenu.prevent="openContextMenu($event, file)"
+                                class="grid-item-card"
+                                style="position: relative; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 0.75rem 0.5rem; display: flex; flex-direction: column; align-items: center; text-align: center; transition: all 0.2s; overflow: hidden; min-height: 130px;"
+                                onmouseover="this.style.background='rgba(255,255,255,0.07)'; this.style.borderColor='rgba(34,211,238,0.4)'; this.style.transform='translateY(-2px)';"
+                                onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.transform='none';"
+                            >
+                                <!-- 3-dots action button -->
+                                <button @click.stop="openItemMenu(file)" 
+                                    style="position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;"
+                                    title="Options">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                                </button>
+
+                                <!-- Thumbnail / Icon Container -->
+                                <div style="width: 100%; height: 75px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.4rem; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.25);">
+                                    <!-- Directory Icon -->
+                                    <template x-if="file.type === 'directory'">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    </template>
+                                    <!-- Image Thumbnail -->
+                                    <template x-if="file.type === 'file' && isImage(file)">
+                                        <img :src="getRawUrl(file)" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;" onerror="this.style.display='none';">
+                                    </template>
+                                    <!-- Media & File Type Icons -->
+                                    <template x-if="file.type === 'file' && !isImage(file)">
+                                        <div>
+                                            <template x-if="isVideo(file)">
+                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                                            </template>
+                                            <template x-if="isAudio(file)">
+                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="1.8"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                                            </template>
+                                            <template x-if="isPdf(file)">
+                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                            </template>
+                                            <template x-if="isText(file)">
+                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                            </template>
+                                            <template x-if="!isVideo(file) && !isAudio(file) && !isPdf(file) && !isText(file)">
+                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <!-- File Name & Size -->
+                                <div style="width: 100%; font-size: 0.78rem; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;" :title="file.name" x-text="file.name"></div>
+                                <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 2px;" x-text="file.type === 'directory' ? 'Folder' : formatSize(file.size)"></div>
+                            </div>
+                        </template>
+
+                        <template x-if="filteredFiles.length === 0">
+                            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem 1rem; opacity: 0.6; font-size: 0.85rem;" x-text="searchQuery ? 'No matching files or folders found for &quot;' + searchQuery + '&quot;.' : 'This directory is empty.'"></div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -2033,6 +2153,12 @@ window.switchApp = function(url) {
             </div>
             <div class="modal-body" style="padding: 1rem 1.5rem;">
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <template x-if="activeItem?.type === 'file' && isPreviewable(activeItem)">
+                        <button @click="previewItem(activeItem); activeItem = null;" class="table-link" style="justify-content: flex-start; padding: 0.75rem; color: var(--accent);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            Preview File
+                        </button>
+                    </template>
                     <template x-if="activeItem?.type === 'file'">
                         <button @click="downloadFile(activeItem)" class="table-link" style="justify-content: flex-start; padding: 0.75rem;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -2170,11 +2296,113 @@ window.switchApp = function(url) {
         </div>
     </div>
 
+    <!-- File Preview Modal -->
+    <div class="modal-overlay" x-show="showPreviewModal" x-cloak @click.self="showPreviewModal = false" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px); z-index: 9999;">
+        <div class="modal-card" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c1222; border: 1px solid rgba(34, 211, 238, 0.3); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);" x-show="showPreviewModal">
+            <!-- Modal Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">
+                <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(34, 211, 238, 0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </div>
+                    <div style="min-width: 0;">
+                        <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="previewFile?.name"></h3>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);" x-text="(previewFile?.size ? formatSize(previewFile.size) : '') + (previewFile?.date ? ' • ' + previewFile.date : '')"></div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <!-- Open in Editor button if text/code -->
+                    <template x-if="isText(previewFile)">
+                        <button type="button" @click="showPreviewModal = false; inspectFile(previewFile)" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; color: var(--accent); border: 1px solid rgba(34,211,238,0.3); border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            <span>Edit File</span>
+                        </button>
+                    </template>
+                    <!-- Download button -->
+                    <button type="button" @click="downloadFile(previewFile)" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;" title="Download">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span class="mobile-hide">Download</span>
+                    </button>
+                    <!-- Close button -->
+                    <button type="button" @click="showPreviewModal = false" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; padding: 4px; display: flex; align-items: center;" title="Close (Esc)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Content Area -->
+            <div style="flex: 1; overflow: auto; padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 280px; max-height: calc(90vh - 70px);">
+                <!-- Image Preview -->
+                <template x-if="previewType === 'image'">
+                    <div style="text-align: center; max-width: 100%; max-height: 100%;">
+                        <img :src="previewFile ? getRawUrl(previewFile) : ''" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                    </div>
+                </template>
+
+                <!-- Video Player -->
+                <template x-if="previewType === 'video'">
+                    <div style="width: 100%; max-width: 800px; text-align: center;">
+                        <video :src="previewFile ? getRawUrl(previewFile) : ''" controls autoplay style="width: 100%; max-height: 65vh; border-radius: 8px; background: #000; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                            Your browser does not support HTML5 video.
+                        </video>
+                    </div>
+                </template>
+
+                <!-- Audio Player -->
+                <template x-if="previewType === 'audio'">
+                    <div style="width: 100%; max-width: 500px; padding: 2rem; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
+                        <div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(236, 72, 153, 0.15); display: flex; align-items: center; justify-content: center; color: #ec4899;">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                        </div>
+                        <div style="font-weight: 600; font-size: 1rem; color: #fff;" x-text="previewFile?.name"></div>
+                        <audio :src="previewFile ? getRawUrl(previewFile) : ''" controls autoplay style="width: 100%;">
+                            Your browser does not support HTML5 audio.
+                        </audio>
+                    </div>
+                </template>
+
+                <!-- PDF Viewer -->
+                <template x-if="previewType === 'pdf'">
+                    <div style="width: 100%; height: 70vh;">
+                        <iframe :src="previewFile ? getRawUrl(previewFile) : ''" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+                    </div>
+                </template>
+
+                <!-- Text / Code Preview -->
+                <template x-if="previewType === 'text'">
+                    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+                        <div x-show="previewLoading" style="display: flex; justify-content: center; align-items: center; padding: 3rem;">
+                            <div class="spinner animate-spin" style="width: 28px; height: 28px; border: 3px solid rgba(34,211,238,0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
+                        </div>
+                        <pre x-show="!previewLoading" style="flex: 1; margin: 0; padding: 1rem; background: #060911; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.5; overflow: auto; max-height: 65vh; white-space: pre-wrap; word-break: break-all;" x-text="previewContent"></pre>
+                    </div>
+                </template>
+
+                <!-- Unsupported / Other File Type -->
+                <template x-if="previewType === 'other'">
+                    <div style="text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <div style="width: 64px; height: 64px; border-radius: 16px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 1rem; color: #fff; margin-bottom: 0.25rem;">Preview not available</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Direct browser preview is not supported for this file format.</div>
+                        </div>
+                        <button type="button" @click="downloadFile(previewFile)" class="btn btn-primary" style="width: auto !important; margin-top: 0.5rem; padding: 0.5rem 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Download File
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
     <script>
         window.addEventListener('hardwareBackPress', (e) => {
             const app = document.querySelector('[x-data="ftpApp"]').__x.$data;
             if (app) {
-                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor) {
+                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showPreviewModal) {
                     e.preventDefault();
                     app.showAddServer = false;
                     app.openServerManager = false;
@@ -2182,6 +2410,7 @@ window.switchApp = function(url) {
                     app.showNewFile = false;
                     app.activeItem = null;
                     app.showEditor = false;
+                    app.showPreviewModal = false;
                 } else if (app.currentPath && app.currentPath !== '/') {
                     e.preventDefault();
                     app.navigateUp();
@@ -2198,6 +2427,13 @@ window.switchApp = function(url) {
                 folderTree: [], // Flattened tree nodes
 
                 files: [],
+                viewMode: localStorage.getItem('fm_view_mode') || 'list',
+                searchQuery: '',
+                showPreviewModal: false,
+                previewFile: null,
+                previewType: '',
+                previewContent: '',
+                previewLoading: false,
                 loading: false,
                 sidebarOpen: false,
                 showMkdir: false,
@@ -2250,6 +2486,13 @@ window.switchApp = function(url) {
                 get pathSegments() {
                     return this.currentPath === '/' ? [] : this.currentPath.split('/').filter(p => p);
                 },
+                get filteredFiles() {
+                    if (!this.searchQuery || !this.searchQuery.trim()) {
+                        return this.files;
+                    }
+                    const q = this.searchQuery.toLowerCase().trim();
+                    return this.files.filter(f => f.name.toLowerCase().includes(q));
+                },
                 get subfolders() {
                     return this.files.filter(f => f.type === 'directory');
                 },
@@ -2288,6 +2531,80 @@ window.switchApp = function(url) {
                 
                 clearSelection() {
                     this.selectedItems = [];
+                },
+
+                setViewMode(mode) {
+                    this.viewMode = mode;
+                    localStorage.setItem('fm_view_mode', mode);
+                },
+
+                isImage(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp', 'avif'].includes(ext);
+                },
+                isVideo(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['mp4', 'webm', 'ogv'].includes(ext);
+                },
+                isAudio(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext);
+                },
+                isPdf(file) {
+                    if (!file || file.type !== 'file') return false;
+                    return file.name.toLowerCase().endsWith('.pdf');
+                },
+                isText(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'log', 'env', 'yml', 'yaml', 'sh', 'sql', 'py', 'php', 'ts', 'jsx', 'tsx', 'conf', 'ini', 'htaccess', 'gitignore'].includes(ext);
+                },
+                isPreviewable(file) {
+                    return this.isImage(file) || this.isVideo(file) || this.isAudio(file) || this.isPdf(file) || this.isText(file);
+                },
+                getRawUrl(file) {
+                    if (!file) return '';
+                    let p = file.fullPath || (this.currentPath === '/' ? '/' + file.name : this.currentPath + '/' + file.name);
+                    return '?action=raw&file=' + encodeURIComponent(p) + '&csrf_token=' + encodeURIComponent(this.csrf_token);
+                },
+
+                async previewItem(file) {
+                    if (!file) return;
+                    window.haptic('impactLight');
+                    this.previewFile = file;
+                    this.showPreviewModal = true;
+                    this.previewContent = '';
+                    if (this.isImage(file)) {
+                        this.previewType = 'image';
+                    } else if (this.isVideo(file)) {
+                        this.previewType = 'video';
+                    } else if (this.isAudio(file)) {
+                        this.previewType = 'audio';
+                    } else if (this.isPdf(file)) {
+                        this.previewType = 'pdf';
+                    } else if (this.isText(file)) {
+                        this.previewType = 'text';
+                        this.previewLoading = true;
+                        let target = file.fullPath || (this.currentPath === '/' ? '/' + file.name : this.currentPath + '/' + file.name);
+                        let res = await this.apiReq({ action: 'read', file: target });
+                        this.previewLoading = false;
+                        if (res && res.success) {
+                            try {
+                                this.previewContent = decodeURIComponent(atob(res.content).split('').map(function (c) {
+                                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                                }).join(''));
+                            } catch(e) {
+                                this.previewContent = atob(res.content);
+                            }
+                        } else {
+                            this.previewContent = (res && res.error) ? res.error : 'Failed to load preview.';
+                        }
+                    } else {
+                        this.previewType = 'other';
+                    }
                 },
 
 
@@ -3245,6 +3562,12 @@ window.switchApp = function(url) {
                     Open Folder
                 </button>
             </template>
+            <template x-if="contextMenu.item?.type === 'file' && isPreviewable(contextMenu.item)">
+                <button @click="previewItem(contextMenu.item); closeContextMenu();" class="table-link" style="padding: 0.5rem 0.75rem; font-size: 0.8rem; color: var(--accent);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    Preview File
+                </button>
+            </template>
             <template x-if="contextMenu.item?.type === 'file'">
                 <button @click="inspectFile(contextMenu.item); closeContextMenu();" class="table-link" style="padding: 0.5rem 0.75rem; font-size: 0.8rem;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -3662,7 +3985,7 @@ function get_qr_data() {
 }
 
 // Handle AJAX/API requests
-if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) && $_GET['action'] === 'download')) {
+if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) && in_array($_GET['action'], ['download', 'raw']))) {
     if (!is_api_request()) {
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
@@ -3680,8 +4003,8 @@ if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) &
         }
     }
 
-    // Direct GET download handler (for direct links with CSRF token or API key)
-    if (isset($_GET['action']) && $_GET['action'] === 'download') {
+    // Direct GET download / raw stream handler (for thumbnails, preview, or downloads)
+    if (isset($_GET['action']) && in_array($_GET['action'], ['download', 'raw'])) {
         validate_csrf_token();
         $file = $_GET['file'] ?? '';
         $validation = validate_path($base_dir, $file);
@@ -3691,8 +4014,15 @@ if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) &
             exit;
         }
         $target = $validation['path'];
-        if (is_file($target)) {
-            while (ob_get_level()) ob_end_clean();
+        if (!is_file($target)) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'File not found']);
+            exit;
+        }
+
+        while (ob_get_level()) ob_end_clean();
+
+        if ($_GET['action'] === 'download') {
             header('Content-Description: File Transfer');
             header('Content-Type: application/octet-stream');
             header('Content-Disposition: attachment; filename="' . basename($target) . '"');
@@ -3702,10 +4032,37 @@ if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) &
             header('Content-Length: ' . filesize($target));
             readfile($target);
             exit;
+        } else {
+            // Raw inline streaming for thumbnails and preview
+            $ext = strtolower(pathinfo($target, PATHINFO_EXTENSION));
+            $mimes = [
+                // Images
+                'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
+                'ico' => 'image/x-icon', 'bmp' => 'image/bmp', 'avif' => 'image/avif',
+                // Audio
+                'mp3' => 'audio/mpeg', 'wav' => 'audio/wav', 'ogg' => 'audio/ogg',
+                'm4a' => 'audio/mp4', 'aac' => 'audio/aac', 'flac' => 'audio/flac',
+                // Video
+                'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogv' => 'video/ogg',
+                // Documents / Text
+                'pdf' => 'application/pdf',
+                'txt' => 'text/plain; charset=utf-8', 'md' => 'text/markdown; charset=utf-8',
+                'json' => 'application/json; charset=utf-8', 'js' => 'text/javascript; charset=utf-8',
+                'css' => 'text/css; charset=utf-8', 'html' => 'text/plain; charset=utf-8',
+                'xml' => 'application/xml; charset=utf-8', 'csv' => 'text/plain; charset=utf-8',
+                'log' => 'text/plain; charset=utf-8', 'env' => 'text/plain; charset=utf-8',
+                'yml' => 'text/plain; charset=utf-8', 'yaml' => 'text/plain; charset=utf-8',
+                'sh' => 'text/plain; charset=utf-8', 'sql' => 'text/plain; charset=utf-8'
+            ];
+            $contentType = $mimes[$ext] ?? 'application/octet-stream';
+            header('Content-Type: ' . $contentType);
+            header('Content-Length: ' . filesize($target));
+            header('Content-Disposition: inline; filename="' . basename($target) . '"');
+            header('Cache-Control: public, max-age=86400');
+            readfile($target);
+            exit;
         }
-        header('Content-Type: application/json');
-        echo json_encode(['error' => 'File not found']);
-        exit;
     }
 
     // Direct path resolution endpoint: checks whether a path is a folder or file

@@ -674,7 +674,7 @@
                         </template>
                         <template x-if="pathEditing">
                             <form @submit.prevent="gotoPath()" style="display: flex; align-items: center; gap: 0.4rem; width: 100%; margin-bottom: 0.5rem;">
-                                <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                <div style="position: relative; flex: 1 1 auto; min-width: 0; width: 100%; display: flex; align-items: center;">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" style="position: absolute; left: 10px; pointer-events: none;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                                     <input 
                                         type="text" 
@@ -682,11 +682,11 @@
                                         x-model="pathInput" 
                                         @keydown.escape.prevent="cancelPathEdit()"
                                         placeholder="Enter folder or file path..." 
-                                        style="width: 100%; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px 6px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none;"
+                                        style="width: 100%; min-width: 0; box-sizing: border-box; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px 6px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none;"
                                     >
                                 </div>
-                                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
-                                <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="padding: 6px 8px; font-size: 0.85rem; border-radius: 6px;" title="Cancel">&times;</button>
+                                <button type="submit" class="btn" style="background: var(--accent); color: #000; width: auto !important; margin: 0 !important; flex-shrink: 0; padding: 6px 14px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
+                                <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="width: auto !important; margin: 0 !important; flex-shrink: 0; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px;" title="Cancel">&times;</button>
                             </form>
                         </template>
 
@@ -762,13 +762,52 @@
                         </div>
                     </div>
 
+                    <!-- File Manager Toolbar: Search Filter & View Mode Switcher -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                        <div style="position: relative; flex: 1; min-width: 180px; display: flex; align-items: center;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.5" style="position: absolute; left: 10px; pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input 
+                                type="text" 
+                                x-model="searchQuery" 
+                                placeholder="Search files & folders..." 
+                                style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.4rem 1.8rem 0.4rem 2rem; color: #fff; font-size: 0.78rem; outline: none; transition: all 0.2s;"
+                            >
+                            <button x-show="searchQuery" @click="searchQuery = ''" type="button" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px;">&times;</button>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">
+                                <span x-text="filteredFiles.length"></span> <span x-text="filteredFiles.length === 1 ? 'item' : 'items'"></span>
+                            </span>
+                            <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 2px;">
+                                <button 
+                                    type="button" 
+                                    @click="setViewMode('list')" 
+                                    :style="viewMode === 'list' ? 'background: rgba(34,211,238,0.15); color: var(--accent);' : 'color: var(--text-secondary);'" 
+                                    style="border: none; padding: 4px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px; font-size: 0.7rem; font-weight: 600;"
+                                    title="List View">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                </button>
+                                <button 
+                                    type="button" 
+                                    @click="setViewMode('grid')" 
+                                    :style="viewMode === 'grid' ? 'background: rgba(34,211,238,0.15); color: var(--accent);' : 'color: var(--text-secondary);'" 
+                                    style="border: none; padding: 4px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px; font-size: 0.7rem; font-weight: 600;"
+                                    title="Grid View">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div x-show="loading" style="text-align: center; padding: 2rem;">
                         <div class="spinner animate-spin"
                             style="width: 24px; height: 24px; border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto;">
                         </div>
                     </div>
 
-                    <div x-show="!loading">
+                    <!-- List View -->
+                    <div x-show="!loading && viewMode === 'list'">
                         <div class="server-item" @click="navigateUp()" style="cursor: pointer;">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -780,10 +819,10 @@
                                 <span style="font-weight: 700;">.. (Up)</span>
                             </div>
                         </div>
-                        <template x-for="item in files" :key="item.name">
+                        <template x-for="item in filteredFiles" :key="item.name">
                             <div class="server-item" @click="() => {
                                     if (selectedItems.length > 0) { toggleSelection(item); } 
-                                    else { item.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + item.name : currentPath + '/' + item.name) : inspectFile(item); }
+                                    else { item.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + item.name : currentPath + '/' + item.name) : (isPreviewable(item) ? previewItem(item) : inspectFile(item)); }
                                 }" @contextmenu.prevent="toggleSelection(item)"
                                 :style="selectedItems.find(i => i.name === item.name) ? 'cursor: pointer; background: rgba(168,85,247,0.15); border-color: var(--accent);' : 'cursor: pointer;'">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
@@ -795,7 +834,10 @@
                                             </path>
                                         </svg>
                                     </template>
-                                    <template x-if="item.type === 'file'">
+                                    <template x-if="item.type === 'file' && isImage(item)">
+                                        <img :src="getRawUrl(item)" loading="lazy" style="width: 24px; height: 24px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" onerror="this.style.display='none';">
+                                    </template>
+                                    <template x-if="item.type === 'file' && !isImage(item)">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink: 0;">
                                             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
@@ -803,29 +845,91 @@
                                         </svg>
                                     </template>
                                     <div
-                                        style="display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+                                        style="display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1;">
                                         <span style="font-weight: 700; overflow: hidden; text-overflow: ellipsis;"
                                             x-text="item.name"></span>
                                         <div style="font-size: 0.55rem; color: var(--text-secondary); opacity: 0.7;"
-                                            x-text="formatSize(item.size) + ' â€¢ ' + item.permissions + ' â€¢ ' + item.date">
+                                            x-text="(item.type === 'directory' ? 'Folder' : formatSize(item.size)) + ' • ' + (item.permissions || '') + ' • ' + (item.date || '')">
                                         </div>
                                     </div>
                                 </div>
-                                <button @click.stop="openItemMenu(item)" class="btn btn-ghost"
-                                    style="padding: 0.4rem; border: none; margin-left: 0.5rem;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" style="pointer-events: none;">
-                                        <circle cx="12" cy="12" r="1"></circle>
-                                        <circle cx="12" cy="5" r="1"></circle>
-                                        <circle cx="12" cy="19" r="1"></circle>
-                                    </svg>
-
-                                </button>
+                                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                    <button x-show="item.type === 'file' && isPreviewable(item)" @click.stop="previewItem(item)" class="btn btn-ghost" style="padding: 0.35rem; border: none; color: var(--accent);" title="Preview">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                    <button @click.stop="openItemMenu(item)" class="btn btn-ghost"
+                                        style="padding: 0.4rem; border: none;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" style="pointer-events: none;">
+                                            <circle cx="12" cy="12" r="1"></circle>
+                                            <circle cx="12" cy="5" r="1"></circle>
+                                            <circle cx="12" cy="19" r="1"></circle>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </template>
-                        <template x-if="files.length === 0">
-                            <div style="text-align: center; padding: 2rem; opacity: 0.5; font-size: 0.8rem;">Folder is
-                                empty.</div>
+                        <template x-if="filteredFiles.length === 0">
+                            <div style="text-align: center; padding: 2.5rem 1rem; opacity: 0.6; font-size: 0.8rem;" x-text="searchQuery ? 'No matches found for &quot;' + searchQuery + '&quot;.' : 'Folder is empty.'"></div>
+                        </template>
+                    </div>
+
+                    <!-- Grid View -->
+                    <div x-show="!loading && viewMode === 'grid'" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 0.65rem; margin-top: 0.25rem;">
+                        <!-- Parent Up Card -->
+                        <div x-show="currentPath !== '/'" @click="navigateUp()" 
+                            style="cursor: pointer; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.15); border-radius: 10px; padding: 0.75rem 0.4rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; text-align: center; min-height: 110px;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            <span style="font-weight: 600; font-size: 0.75rem; color: var(--text-secondary);">.. (Up)</span>
+                        </div>
+
+                        <!-- Grid Cards -->
+                        <template x-for="item in filteredFiles" :key="item.name">
+                            <div 
+                                @click="item.type === 'directory' ? navigateTo(currentPath === '/' ? '/' + item.name : currentPath + '/' + item.name) : (isPreviewable(item) ? previewItem(item) : inspectFile(item))"
+                                @contextmenu.prevent="toggleSelection(item)"
+                                style="position: relative; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.6rem 0.4rem; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; min-height: 110px;"
+                            >
+                                <button @click.stop="openItemMenu(item)" 
+                                    style="position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2;">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                                </button>
+
+                                <div style="width: 100%; height: 60px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.35rem; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.25);">
+                                    <template x-if="item.type === 'directory'">
+                                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    </template>
+                                    <template x-if="item.type === 'file' && isImage(item)">
+                                        <img :src="getRawUrl(item)" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" onerror="this.style.display='none';">
+                                    </template>
+                                    <template x-if="item.type === 'file' && !isImage(item)">
+                                        <div>
+                                            <template x-if="isVideo(item)">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                                            </template>
+                                            <template x-if="isAudio(item)">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="1.8"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                                            </template>
+                                            <template x-if="isPdf(item)">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                            </template>
+                                            <template x-if="isText(item)">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                            </template>
+                                            <template x-if="!isVideo(item) && !isAudio(item) && !isPdf(item) && !isText(item)">
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <div style="width: 100%; font-size: 0.72rem; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;" :title="item.name" x-text="item.name"></div>
+                                <div style="font-size: 0.62rem; color: var(--text-secondary); margin-top: 2px;" x-text="item.type === 'directory' ? 'Folder' : formatSize(item.size)"></div>
+                            </div>
+                        </template>
+
+                        <template x-if="filteredFiles.length === 0">
+                            <div style="grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; opacity: 0.6; font-size: 0.8rem;" x-text="searchQuery ? 'No matches found for &quot;' + searchQuery + '&quot;.' : 'Folder is empty.'"></div>
                         </template>
                     </div>
                 </div>
@@ -980,6 +1084,17 @@
                 </div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <template x-if="activeItem?.type === 'file' && isPreviewable(activeItem)">
+                    <button @click="previewItem(activeItem); activeItem = null;" class="btn btn-ghost"
+                        style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(34, 211, 238, 0.08); color: var(--accent);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right: 0.75rem;">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        Preview File
+                    </button>
+                </template>
                 <template x-if="activeItem?.type === 'file'">
                     <button @click="downloadFile(activeItem)" class="btn btn-ghost"
                         style="justify-content: flex-start; padding: 0.75rem; border:none; background: rgba(255,255,255,0.03);">
@@ -1169,6 +1284,105 @@
                 <span x-show="!loading">SAVE CHANGES</span>
                 <span x-show="loading">SAVING...</span>
             </button>
+        </div>
+    </div>
+
+    <!-- File Preview Modal -->
+    <div class="modal-overlay" x-show="showPreviewModal" x-cloak @click.self="showPreviewModal = false" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px); z-index: 9999;">
+        <div class="modal-card" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c1222; border: 1px solid rgba(34, 211, 238, 0.3); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);" x-show="showPreviewModal">
+            <!-- Modal Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">
+                <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(34, 211, 238, 0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </div>
+                    <div style="min-width: 0;">
+                        <h3 style="font-size: 1rem; font-weight: 700; margin: 0; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="previewFile?.name"></h3>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);" x-text="(previewFile?.size ? formatSize(previewFile.size) : '') + (previewFile?.date ? ' • ' + previewFile.date : '')"></div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <!-- Edit file button if text/code -->
+                    <template x-if="isText(previewFile)">
+                        <button type="button" @click="showPreviewModal = false; inspectFile(previewFile)" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; color: var(--accent); border: 1px solid rgba(34,211,238,0.3); border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            <span>Edit</span>
+                        </button>
+                    </template>
+                    <!-- Download button -->
+                    <button type="button" @click="downloadFile(previewFile)" class="btn btn-ghost" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 4px;" title="Download">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <!-- Close button -->
+                    <button type="button" @click="showPreviewModal = false" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; padding: 4px; display: flex; align-items: center;" title="Close">&times;</button>
+                </div>
+            </div>
+
+            <!-- Modal Content Area -->
+            <div style="flex: 1; overflow: auto; padding: 1.5rem; display: flex; align-items: center; justify-content: center; min-height: 280px; max-height: calc(90vh - 70px);">
+                <!-- Image Preview -->
+                <template x-if="previewType === 'image'">
+                    <div style="text-align: center; max-width: 100%; max-height: 100%;">
+                        <img :src="previewFile ? getRawUrl(previewFile) : ''" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                    </div>
+                </template>
+
+                <!-- Video Player -->
+                <template x-if="previewType === 'video'">
+                    <div style="width: 100%; max-width: 800px; text-align: center;">
+                        <video :src="previewFile ? getRawUrl(previewFile) : ''" controls autoplay style="width: 100%; max-height: 65vh; border-radius: 8px; background: #000; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                            Your browser does not support HTML5 video.
+                        </video>
+                    </div>
+                </template>
+
+                <!-- Audio Player -->
+                <template x-if="previewType === 'audio'">
+                    <div style="width: 100%; max-width: 500px; padding: 2rem; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
+                        <div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(236, 72, 153, 0.15); display: flex; align-items: center; justify-content: center; color: #ec4899;">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                        </div>
+                        <div style="font-weight: 600; font-size: 1rem; color: #fff;" x-text="previewFile?.name"></div>
+                        <audio :src="previewFile ? getRawUrl(previewFile) : ''" controls autoplay style="width: 100%;">
+                            Your browser does not support HTML5 audio.
+                        </audio>
+                    </div>
+                </template>
+
+                <!-- PDF Viewer -->
+                <template x-if="previewType === 'pdf'">
+                    <div style="width: 100%; height: 70vh;">
+                        <iframe :src="previewFile ? getRawUrl(previewFile) : ''" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+                    </div>
+                </template>
+
+                <!-- Text / Code Preview -->
+                <template x-if="previewType === 'text'">
+                    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+                        <div x-show="previewLoading" style="display: flex; justify-content: center; align-items: center; padding: 3rem;">
+                            <div class="spinner animate-spin" style="width: 28px; height: 28px; border: 3px solid rgba(34,211,238,0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
+                        </div>
+                        <pre x-show="!previewLoading" style="flex: 1; margin: 0; padding: 1rem; background: #060911; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.5; overflow: auto; max-height: 65vh; white-space: pre-wrap; word-break: break-all;" x-text="previewContent"></pre>
+                    </div>
+                </template>
+
+                <!-- Unsupported / Other File Type -->
+                <template x-if="previewType === 'other'">
+                    <div style="text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <div style="width: 64px; height: 64px; border-radius: 16px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 1rem; color: #fff; margin-bottom: 0.25rem;">Preview not available</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Direct browser preview is not supported for this file format.</div>
+                        </div>
+                        <button type="button" @click="downloadFile(previewFile)" class="btn btn-primary" style="width: auto !important; margin-top: 0.5rem; padding: 0.5rem 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Download File
+                        </button>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 
@@ -1369,7 +1583,7 @@
                     app.terminalMaximized = false;
                     return;
                 }
-                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner || app.showTerminal) {
+                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner || app.showTerminal || app.showPreviewModal) {
                     e.preventDefault();
                     app.showAddServer = false;
                     app.openServerManager = false;
@@ -1378,6 +1592,7 @@
                     app.activeItem = null;
                     app.showEditor = false;
                     app.showTerminal = false;
+                    app.showPreviewModal = false;
                     app.stopQRScanner(); // Ensure scanner stops
                 } else if (app.currentPath && app.currentPath !== '/') {
                     e.preventDefault();
@@ -1409,6 +1624,13 @@
                 editingServerIdx: null,
                 currentPath: '/',
                 files: [],
+                viewMode: localStorage.getItem('fm_view_mode') || 'list',
+                searchQuery: '',
+                showPreviewModal: false,
+                previewFile: null,
+                previewType: '',
+                previewContent: '',
+                previewLoading: false,
                 loading: false,
                 selectedItems: [],
                 openServerManager: false,
@@ -1433,6 +1655,13 @@
                 get pathSegments() {
                     return this.currentPath === '/' ? [] : this.currentPath.split('/').filter(p => p);
                 },
+                get filteredFiles() {
+                    if (!this.searchQuery || !this.searchQuery.trim()) {
+                        return this.files;
+                    }
+                    const q = this.searchQuery.toLowerCase().trim();
+                    return this.files.filter(f => f.name.toLowerCase().includes(q));
+                },
                 get subfolders() {
                     return this.files.filter(f => f.type === 'directory');
                 },
@@ -1449,6 +1678,86 @@
 
                 clearSelection() {
                     this.selectedItems = [];
+                },
+
+                setViewMode(mode) {
+                    this.viewMode = mode;
+                    localStorage.setItem('fm_view_mode', mode);
+                },
+
+                isImage(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp', 'avif'].includes(ext);
+                },
+                isVideo(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['mp4', 'webm', 'ogv'].includes(ext);
+                },
+                isAudio(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext);
+                },
+                isPdf(file) {
+                    if (!file || file.type !== 'file') return false;
+                    return file.name.toLowerCase().endsWith('.pdf');
+                },
+                isText(file) {
+                    if (!file || file.type !== 'file') return false;
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'log', 'env', 'yml', 'yaml', 'sh', 'sql', 'py', 'php', 'ts', 'jsx', 'tsx', 'conf', 'ini', 'htaccess', 'gitignore'].includes(ext);
+                },
+                isPreviewable(file) {
+                    return this.isImage(file) || this.isVideo(file) || this.isAudio(file) || this.isPdf(file) || this.isText(file);
+                },
+                getRawUrl(file) {
+                    if (!this.currentServer || !file) return '';
+                    let p = file.fullPath || (this.currentPath === '/' ? '/' + file.name : this.currentPath + '/' + file.name);
+                    let url = new URL(this.currentServer.url);
+                    url.searchParams.append('action', 'raw');
+                    url.searchParams.append('file', p);
+                    if (this.currentServer.apiKey) {
+                        url.searchParams.append('api_key', this.currentServer.apiKey);
+                    }
+                    return url.toString();
+                },
+
+                async previewItem(file) {
+                    if (!file) return;
+                    window.haptic('impactLight');
+                    this.previewFile = file;
+                    this.showPreviewModal = true;
+                    this.previewContent = '';
+                    if (this.isImage(file)) {
+                        this.previewType = 'image';
+                    } else if (this.isVideo(file)) {
+                        this.previewType = 'video';
+                    } else if (this.isAudio(file)) {
+                        this.previewType = 'audio';
+                    } else if (this.isPdf(file)) {
+                        this.previewType = 'pdf';
+                    } else if (this.isText(file)) {
+                        this.previewType = 'text';
+                        this.previewLoading = true;
+                        let target = file.fullPath || (this.currentPath === '/' ? '/' + file.name : this.currentPath + '/' + file.name);
+                        let res = await this.apiReq({ action: 'read', file: target });
+                        this.previewLoading = false;
+                        if (res && res.success) {
+                            try {
+                                this.previewContent = decodeURIComponent(atob(res.content).split('').map(function (c) {
+                                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                                }).join(''));
+                            } catch(e) {
+                                this.previewContent = atob(res.content);
+                            }
+                        } else {
+                            this.previewContent = (res && res.error) ? res.error : 'Failed to load preview.';
+                        }
+                    } else {
+                        this.previewType = 'other';
+                    }
                 },
 
 

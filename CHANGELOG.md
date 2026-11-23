@@ -4,6 +4,36 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.5.3] - 2026-11-23
+### Added
+- **Grid View with Image Thumbnails**:
+  - Added seamless toggle between List View and Grid View in FileLuxe (`fm.php`) and ServerLuxe app (`fm.html`).
+  - Grid View displays modern cards for folders and files with visual indicators and quick action menus.
+  - Generates and streams real image thumbnails (`jpg`, `jpeg`, `png`, `gif`, `webp`, `svg`, `ico`, `avif`) via the new streaming endpoint (`?action=raw&file=...`).
+  - Dedicated media badges and icons for video, audio, PDF, and code/text files.
+- **Universal File Preview Modal**:
+  - Full-featured Quick Look / Preview modal supporting multiple media and document types:
+    - Images: Full preview with contain/aspect-ratio scaling and zoom.
+    - Videos: Integrated HTML5 video player (`mp4`, `webm`, `ogv`).
+    - Audio: High-fidelity audio player (`mp3`, `wav`, `ogg`, `m4a`, `aac`, `flac`).
+    - PDFs: Embedded document reader (`<iframe>`).
+    - Code & Text: Formatted code viewer with one-click "Edit File" button.
+    - Unsupported formats: Informative card with metadata and direct download action.
+  - Preview accessible via table eye icon `[ 👁 ]`, clicking grid items, right-click context menu, or item action sheet.
+- **Real-Time Search Filter**:
+  - Added an instant search bar on the table and file manager header to filter files and folders in real time by filename.
+  - Includes a clear button (`×`) and dynamic match counter (`filteredFiles`).
+- **Icon-Only Header Buttons**:
+  - Streamlined top navigation header with compact, modern icon-only buttons for Switch to Database, Terminal, and Disconnect.
+  - Maintained accessibility and clarity via native tooltips and unified 36x36px dimensions.
+
+### Fixed
+- **Path Editor Input Collapsing**:
+  - Fixed an issue where clicking the path edit pencil rendered an oversized "Go" button squashing the text input to an unclickable box.
+  - Isolated the button styling from global `.btn-primary` 100% width rules and applied flexbox containment (`flex: 1 1 auto; min-width: 0;`).
+
+---
+
 ## [1.5.2] - 2026-11-23
 ### Added
 - **Direct Path Editing & Go to Folder/File**:
