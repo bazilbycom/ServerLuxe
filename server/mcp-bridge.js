@@ -58,10 +58,12 @@
  * AVAILABLE TOOLS (delegated to the server; call tools/list for the live list)
  * ---------------------------------------------------------------------------
  *   File manager (fm.php):
- *     - list_directory { path }            -> lists a directory
- *     - read_file      { path }            -> reads a file (must be in an allowed folder)
- *     - write_file     { path, content }   -> writes/creates a file
- *     - delete_file    { path }            -> deletes a file or directory
+ *     - list_directory  { path }            -> lists a directory
+ *     - read_file       { path }            -> reads a file (must be in an allowed folder)
+ *     - write_file      { path, content }   -> writes/creates a file
+ *     - create_folder   { path }            -> creates a directory/folder
+ *     - delete_file     { path }            -> deletes a file or directory
+ *     - execute_command { command, cwd }    -> executes terminal command (requires terminal enabled)
  *   Database (db.php):
  *     - query_database, list_tables, describe_table, ... (per server config)
  *

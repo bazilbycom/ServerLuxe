@@ -51,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.4.3');
+define('VERSION', '1.5.0');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -97,27 +97,42 @@ function format_permissions($mode) {
 
 // SECURITY: Path validation to prevent directory traversal attacks
 function validate_path($base_dir, $user_path) {
-    $user_path = ltrim($user_path, '/');
-    $target = $base_dir . '/' . $user_path;
+    $norm_base = rtrim(str_replace('\\', '/', $base_dir), '/');
+    if ($norm_base === '') $norm_base = '/';
+
+    $user_path = ltrim(str_replace('\\', '/', $user_path), '/');
+    $target = ($norm_base === '/') ? '/' . $user_path : $norm_base . '/' . $user_path;
     $real_path = realpath($target);
 
-    // If path doesn't exist (e.g., for mkdir, upload), validate parent
+    // If path doesn't exist (e.g., for mkdir, upload, touch), validate ancestor hierarchy
     if ($real_path === false) {
-        $parent = dirname($target);
-        $real_path = realpath($parent);
-        if ($real_path === false || stripos($real_path, $base_dir) !== 0) {
+        $curr = $target;
+        $missing = [];
+        while ($curr !== '' && $curr !== '/' && $curr !== '.' && !file_exists($curr)) {
+            $missing[] = basename($curr);
+            $parent = dirname($curr);
+            if ($parent === $curr) break;
+            $curr = $parent;
+        }
+        $real_parent = realpath($curr);
+        if ($real_parent === false) {
             return ['valid' => false, 'path' => $base_dir, 'normalized' => '/'];
         }
-        $real_path = $real_path . '/' . basename($target);
+        $norm_parent = str_replace('\\', '/', $real_parent);
+        if ($norm_base !== '/' && stripos($norm_parent, $norm_base) !== 0) {
+            return ['valid' => false, 'path' => $base_dir, 'normalized' => '/'];
+        }
+        $real_path = rtrim($norm_parent, '/') . '/' . implode('/', array_reverse($missing));
     }
 
+    $norm_real = str_replace('\\', '/', $real_path);
     // Check if resolved path is within base_dir
-    if (stripos($real_path, $base_dir) !== 0) {
+    if ($norm_base !== '/' && stripos($norm_real, $norm_base) !== 0) {
         return ['valid' => false, 'path' => $base_dir, 'normalized' => '/'];
     }
 
     // Calculate normalized path
-    $normalized = '/' . ltrim(str_ireplace($base_dir, '', str_replace('\\', '/', $real_path)), '/');
+    $normalized = ($norm_base === '/') ? '/' . ltrim($norm_real, '/') : '/' . ltrim(substr($norm_real, strlen($norm_base)), '/');
 
     return ['valid' => true, 'path' => $real_path, 'normalized' => $normalized];
 }
@@ -171,11 +186,30 @@ function get_csrf_token() {
     return $_SESSION['csrf_token'];
 }
 
+// Helper to verify stateless API Key authentication (via header, query param, POST body, or Bearer auth)
+function is_api_key_request() {
+    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_POST['api_key'] ?? $_GET['api_key'] ?? '';
+    if (empty($provided_key) && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        if (preg_match('/Bearer\s+(.*)$/i', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
+            $provided_key = trim($matches[1]);
+        }
+    }
+    if (empty($provided_key) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $k => $v) {
+            if (strcasecmp($k, 'X-API-KEY') === 0) {
+                $provided_key = $v;
+                break;
+            }
+        }
+    }
+    return !empty(API_KEY) && !empty($provided_key) && hash_equals(API_KEY, $provided_key);
+}
+
 function validate_csrf_token() {
     // API key requests don't need CSRF (stateless)
-    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
-    if (!empty(API_KEY) && hash_equals(API_KEY, $provided_key)) {
-        return;
+    if (is_api_key_request()) {
+        return true;
     }
 
     // Session-based requests need CSRF
@@ -186,12 +220,23 @@ function validate_csrf_token() {
     }
 
     $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+    if (empty($token) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $k => $v) {
+            if (strcasecmp($k, 'X-CSRF-TOKEN') === 0) {
+                $token = $v;
+                break;
+            }
+        }
+    }
 
     if (empty($token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         header('Content-Type: application/json');
         echo json_encode(['error' => 'CSRF token mismatch or session expired.']);
         exit;
     }
+
+    return true;
 }
 
 // SECURITY: Rate limiting for login attempts
@@ -231,18 +276,9 @@ function record_failed_login() {
 }
 
 function is_api_request() {
-    // If we have a session, it's not a "pure" API request from a remote node, but it's authorized.
+    // If we have an active session, it's authorized.
     if (!empty($_SESSION['fm_authenticated'])) return true;
-
-    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_POST['api_key'] ?? $_GET['api_key'] ?? '';
-    
-    // Check API Key
-    if (!empty(API_KEY)) {
-        if (hash_equals(API_KEY, $provided_key)) {
-            return true;
-        }
-    }
-    return false;
+    return is_api_key_request();
 }
 
 // ============ MCP & AUTO-UPDATE INTEGRATION ============
@@ -271,6 +307,148 @@ function save_mcp_config($config) {
         @chmod($config_file, 0666);
     }
     return $res;
+}
+
+function is_terminal_enabled() {
+    if (isset($_ENV['ENABLE_TERMINAL'])) {
+        $val = strtolower(trim($_ENV['ENABLE_TERMINAL']));
+        if ($val === 'true' || $val === '1' || $val === 'yes') return true;
+        if ($val === 'false' || $val === '0' || $val === 'no') return false;
+    }
+    $config = load_mcp_config();
+    if (isset($config['terminal']['enabled'])) {
+        return (bool)$config['terminal']['enabled'];
+    }
+    return false;
+}
+
+function set_terminal_enabled($enabled) {
+    $config = load_mcp_config();
+    if (!isset($config['terminal']) || !is_array($config['terminal'])) {
+        $config['terminal'] = [];
+    }
+    $config['terminal']['enabled'] = (bool)$enabled;
+    return save_mcp_config($config);
+}
+
+function run_terminal_command($cmd, $cwd = null, $timeout = 30) {
+    if (!function_exists('proc_open')) {
+        return [
+            'stdout' => '',
+            'stderr' => 'Process execution (proc_open) is disabled by server php.ini configuration.',
+            'exit_code' => 127,
+            'cwd' => str_replace('\\', '/', $cwd ?: __DIR__),
+            'error' => 'proc_open() is disabled on this server.'
+        ];
+    }
+
+    $work_dir = $cwd ? realpath($cwd) : false;
+    if (!$work_dir || !is_dir($work_dir)) {
+        $work_dir = __DIR__;
+    }
+
+    $trimmed_cmd = trim($cmd);
+    if ($trimmed_cmd === '') {
+        return [
+            'stdout' => '',
+            'stderr' => '',
+            'exit_code' => 0,
+            'cwd' => str_replace('\\', '/', $work_dir),
+            'error' => null
+        ];
+    }
+
+    // Handle "cd <path>" separately to update directory tracking
+    if (preg_match('/^cd(?:\s+(.*))?$/i', $trimmed_cmd, $matches)) {
+        $target = trim($matches[1] ?? '');
+        if ($target === '' || $target === '~') {
+            $target = getenv('HOME') ?: __DIR__;
+        } else {
+            $target = trim($target, "\"'");
+            if (strpos($target, '/') !== 0 && strpos($target, ':') !== 1) {
+                $target = $work_dir . '/' . $target;
+            }
+        }
+        $real_target = realpath($target);
+        if ($real_target && is_dir($real_target)) {
+            return [
+                'stdout' => '',
+                'stderr' => '',
+                'exit_code' => 0,
+                'cwd' => str_replace('\\', '/', $real_target),
+                'error' => null
+            ];
+        } else {
+            return [
+                'stdout' => '',
+                'stderr' => "cd: no such file or directory: " . ($matches[1] ?? '') . "\n",
+                'exit_code' => 1,
+                'cwd' => str_replace('\\', '/', $work_dir),
+                'error' => null
+            ];
+        }
+    }
+
+    $descriptors = [
+        0 => ["pipe", "r"], // stdin
+        1 => ["pipe", "w"], // stdout
+        2 => ["pipe", "w"]  // stderr
+    ];
+
+    $process = @proc_open($cmd, $descriptors, $pipes, $work_dir);
+    if (!is_resource($process)) {
+        return [
+            'stdout' => '',
+            'stderr' => 'Failed to initialize system process. Check server permissions.',
+            'exit_code' => 1,
+            'cwd' => str_replace('\\', '/', $work_dir),
+            'error' => 'proc_open() failed to spawn process.'
+        ];
+    }
+
+    fclose($pipes[0]);
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $stdout = '';
+    $stderr = '';
+    $start = time();
+    $max_time = max(3, min((int)$timeout, 120));
+
+    while (true) {
+        $r1 = stream_get_contents($pipes[1]);
+        $r2 = stream_get_contents($pipes[2]);
+        if ($r1 !== false && $r1 !== '') $stdout .= $r1;
+        if ($r2 !== false && $r2 !== '') $stderr .= $r2;
+
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            $r1 = stream_get_contents($pipes[1]);
+            $r2 = stream_get_contents($pipes[2]);
+            if ($r1 !== false && $r1 !== '') $stdout .= $r1;
+            if ($r2 !== false && $r2 !== '') $stderr .= $r2;
+            break;
+        }
+
+        if ((time() - $start) > $max_time) {
+            @proc_terminate($process, 9);
+            $stderr .= "\n[Execution aborted: process exceeded {$max_time}s timeout limit]";
+            break;
+        }
+        usleep(25000); // 25ms
+    }
+
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exit_code = proc_close($process);
+
+    return [
+        'stdout' => $stdout,
+        'stderr' => $stderr,
+        'exit_code' => $exit_code,
+        'cwd' => str_replace('\\', '/', $work_dir),
+        'error' => null
+    ];
 }
 
 function has_mcp_permission($type, $name, $access_type) {
@@ -469,6 +647,31 @@ function execute_fm_tool($tool, $arguments) {
         return $result;
     }
 
+    if ($tool === 'execute_command' || $tool === 'terminal' || $tool === 'run_command') {
+        if (!is_terminal_enabled()) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: Terminal execution is disabled on this server. Enable it in the ServerLuxe web settings panel or set ENABLE_TERMINAL=true in .env."];
+        } else {
+            $cmd = $arguments['command'] ?? '';
+            $cwd = $arguments['cwd'] ?? null;
+            $timeout = (int)($arguments['timeout'] ?? 30);
+            $run = run_terminal_command($cmd, $cwd, $timeout);
+            if (!empty($run['error']) && empty($run['stdout']) && empty($run['stderr'])) {
+                $result['isError'] = true;
+                $result['content'][] = ['type' => 'text', 'text' => "Error: " . $run['error']];
+            } else {
+                $summary = [
+                    'stdout' => $run['stdout'],
+                    'stderr' => $run['stderr'],
+                    'exit_code' => $run['exit_code'],
+                    'cwd' => $run['cwd']
+                ];
+                $result['content'][] = ['type' => 'text', 'text' => json_encode($summary, JSON_PRETTY_PRINT)];
+            }
+        }
+        return $result;
+    }
+
     $path = $arguments['path'] ?? '';
     $base_dir = (DIRECTORY_SEPARATOR === '\\') ? substr(realpath(__DIR__), 0, 3) : '/';
     $v = validate_path($base_dir, $path);
@@ -539,6 +742,25 @@ function execute_fm_tool($tool, $arguments) {
                 $result['content'][] = ['type' => 'text', 'text' => "Success: Path deleted successfully."];
             }
         }
+    } elseif ($tool === 'create_folder' || $tool === 'mkdir') {
+        if (!has_mcp_permission('folders', $resolved_path, 'write')) {
+            $result['isError'] = true;
+            $result['content'][] = ['type' => 'text', 'text' => "Error: AI does not have Write access to folder '{$resolved_path}'."];
+        } else {
+            if (is_dir($resolved_path)) {
+                $result['content'][] = ['type' => 'text', 'text' => "Success: Directory already exists at '{$resolved_path}'."];
+            } else {
+                $ok = @mkdir($resolved_path, 0755, true);
+                if (!$ok) {
+                    $err = error_get_last();
+                    $errMsg = ($err && !empty($err['message'])) ? $err['message'] : "Failed to create directory. Check filesystem permissions.";
+                    $result['isError'] = true;
+                    $result['content'][] = ['type' => 'text', 'text' => "Error: {$errMsg}"];
+                } else {
+                    $result['content'][] = ['type' => 'text', 'text' => "Success: Directory created successfully at '{$resolved_path}'."];
+                }
+            }
+        }
     } else {
         $result['isError'] = true;
         $result['content'][] = ['type' => 'text', 'text' => "Unknown tool: {$tool}"];
@@ -549,12 +771,14 @@ function execute_fm_tool($tool, $arguments) {
 
 // Plain REST API endpoint for AI agents that can't spawn a local MCP bridge
 // process — a single HTTP call, no stdio/JSON-RPC required.
-// GET/POST ?action=api&tool=list_directory|read_file|write_file|delete_file|get_server_docs
-// Auth: X-API-KEY header (or api_key param). Params: path, content (write_file only).
+// GET/POST ?action=api&tool=list_directory|read_file|write_file|create_folder|delete_file|execute_command|get_server_docs
+// Auth: X-API-KEY header (or api_key param).
+// Params:
+//   - path, content (write_file only)
+//   - command, cwd, timeout (execute_command / terminal only)
 if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'api') {
-    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
     header('Content-Type: application/json');
-    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+    if (!is_api_key_request()) {
         header('HTTP/1.1 401 Unauthorized');
         echo json_encode(['error' => 'Unauthorized']);
         exit;
@@ -563,7 +787,10 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'api') {
     $tool = $_REQUEST['tool'] ?? '';
     $arguments = [
         'path' => $_REQUEST['path'] ?? '',
-        'content' => $_REQUEST['content'] ?? ''
+        'content' => $_REQUEST['content'] ?? '',
+        'command' => $_REQUEST['command'] ?? $_REQUEST['cmd'] ?? '',
+        'cwd' => $_REQUEST['cwd'] ?? null,
+        'timeout' => isset($_REQUEST['timeout']) ? (int)$_REQUEST['timeout'] : 30
     ];
     $result = execute_fm_tool($tool, $arguments);
 
@@ -578,8 +805,7 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'api') {
 
 // MCP API endpoint
 if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
-    $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_REQUEST['api_key'] ?? '';
-    if (empty(API_KEY) || !hash_equals(API_KEY, $provided_key)) {
+    if (!is_api_key_request()) {
         header('Content-Type: application/json', true, 401);
         echo json_encode(['error' => 'Unauthorized']);
         exit;
@@ -638,6 +864,17 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
                         ]
                     ],
                     [
+                        'name' => 'create_folder',
+                        'description' => 'Create a new directory or folder',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'path' => ['type' => 'string', 'description' => 'Directory path to create (relative or absolute)']
+                            ],
+                            'required' => ['path']
+                        ]
+                    ],
+                    [
                         'name' => 'delete_file',
                         'description' => 'Delete a file or directory',
                         'inputSchema' => [
@@ -646,6 +883,19 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] === 'mcp_api') {
                                 'path' => ['type' => 'string', 'description' => 'File or directory path']
                             ],
                             'required' => ['path']
+                        ]
+                    ],
+                    [
+                        'name' => 'execute_command',
+                        'description' => 'Execute a shell/terminal command on the server (requires terminal access enabled in Web panel or ENABLE_TERMINAL=true in .env)',
+                        'inputSchema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'command' => ['type' => 'string', 'description' => 'Shell command to execute'],
+                                'cwd' => ['type' => 'string', 'description' => 'Optional working directory path'],
+                                'timeout' => ['type' => 'integer', 'description' => 'Command execution timeout in seconds (default 30, max 120)']
+                            ],
+                            'required' => ['command']
                         ]
                     ],
                     [
@@ -696,7 +946,21 @@ if (isset($_SESSION['fm_authenticated']) || is_api_request()) {
         $config = load_mcp_config();
         if (empty($config['databases'])) $config['databases'] = (object)[];
         if (empty($config['folders'])) $config['folders'] = (object)[];
+        $config['terminal_enabled'] = is_terminal_enabled();
+        $config['proc_open_available'] = function_exists('proc_open');
         echo json_encode($config);
+        exit;
+    }
+    if (isset($_POST['action']) && $_POST['action'] === 'toggle_terminal') {
+        validate_csrf_token();
+        $enabled = !empty($_POST['enabled']) && ($_POST['enabled'] === '1' || $_POST['enabled'] === 'true');
+        $res = set_terminal_enabled($enabled);
+        header('Content-Type: application/json');
+        if ($res === false) {
+            echo json_encode(['success' => false, 'error' => 'Failed to update terminal setting. Check write permissions for mcp_config.json']);
+        } else {
+            echo json_encode(['success' => true, 'terminal_enabled' => is_terminal_enabled()]);
+        }
         exit;
     }
     if (isset($_POST['action']) && $_POST['action'] === 'save_mcp_config') {
@@ -1305,6 +1569,10 @@ window.switchApp = function(url) {
                     <span class="btn-text">Switch to Database</span>
                 </a>
                 <?php endif; ?>
+                <button @click="openTerminal" class="btn btn-ghost" style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent); font-weight: 600; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(34, 211, 238, 0.25); border-radius: 0.75rem; background: rgba(34, 211, 238, 0.05);" title="Open Terminal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <span class="btn-text">Terminal</span>
+                </button>
                 <a href="?action=logout" class="btn btn-ghost" style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--danger); font-weight: 600; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 0.75rem;" title="Disconnect">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     <span class="btn-text">Disconnect</span>
@@ -1356,6 +1624,11 @@ window.switchApp = function(url) {
                                 <button @click="showRemoteUpload = true" class="btn-group-item" title="Remote Upload">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"></path><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                                     <span class="btn-text">Remote</span>
+                                </button>
+
+                                <button @click="openTerminal" class="btn-group-item" title="Terminal" style="color: var(--accent);">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                    <span class="btn-text">Terminal</span>
                                 </button>
 
                                 <button @click="fetchFiles(currentPath)" class="btn-group-item" title="Refresh" style="border-right: none;">
@@ -1630,6 +1903,15 @@ window.switchApp = function(url) {
                 showMcpModal: false,
                 mcpConfig: { databases: {}, folders: {} },
                 newMcpFolder: '',
+                terminalEnabled: false,
+                procOpenAvailable: true,
+                showTerminal: false,
+                terminalLoading: false,
+                terminalInput: '',
+                terminalLogs: [],
+                terminalHistory: [],
+                terminalHistoryIdx: -1,
+                terminalCwd: '',
                 updateInfo: { checked: false, available: false, current: '<?php echo VERSION; ?>', latest: '', commitsBehind: 0, loading: false, error: '' },
                 mcpCopied: false,
                 mcpBaseUrl: localStorage.getItem('mcpBaseUrl') || '<?php
@@ -1813,7 +2095,7 @@ window.switchApp = function(url) {
 
 
                     try {
-                        let url = new URL(window.location.href);
+                        let url = new URL(window.location.pathname, window.location.origin);
                         let body = null;
 
                         if (method === 'GET') {
@@ -1822,6 +2104,9 @@ window.switchApp = function(url) {
                         } else {
                             if (isFormData) {
                                 body = params;
+                                if (this.csrf_token && !body.has('csrf_token')) {
+                                    body.append('csrf_token', this.csrf_token);
+                                }
                             } else {
                                 body = new FormData();
                                 Object.keys(params).forEach(k => body.append(k, params[k]));
@@ -1869,6 +2154,8 @@ window.switchApp = function(url) {
                         this.mcpConfig = await res.json();
                         if (!this.mcpConfig.databases || Array.isArray(this.mcpConfig.databases)) this.mcpConfig.databases = {};
                         if (!this.mcpConfig.folders || Array.isArray(this.mcpConfig.folders)) this.mcpConfig.folders = {};
+                        this.terminalEnabled = !!this.mcpConfig.terminal_enabled;
+                        this.procOpenAvailable = this.mcpConfig.proc_open_available !== false;
                     } catch(e) {
                         console.error('Failed to load MCP config:', e);
                     } finally {
@@ -1996,6 +2283,157 @@ window.switchApp = function(url) {
                     }
                 },
 
+                // Terminal Methods
+                async openTerminal() {
+                    this.showTerminal = true;
+                    if (!this.terminalCwd) {
+                        this.terminalCwd = this.currentPath || '/';
+                    }
+                    if (this.terminalLogs.length === 0) {
+                        this.terminalLogs.push({
+                            type: 'info',
+                            text: 'ServerLuxe Web Terminal initialized. Type a command or click a quick action below.\nWorking directory: ' + this.terminalCwd
+                        });
+                    }
+                    // Fetch latest terminal status from server
+                    try {
+                        const res = await fetch('?action=get_mcp_config');
+                        const data = await res.json();
+                        this.terminalEnabled = !!data.terminal_enabled;
+                        this.procOpenAvailable = data.proc_open_available !== false;
+                    } catch(e) {}
+                    this.$nextTick(() => {
+                        if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
+                        this.scrollTerminal();
+                    });
+                },
+
+                scrollTerminal() {
+                    this.$nextTick(() => {
+                        if (this.$refs.terminalBody) {
+                            this.$refs.terminalBody.scrollTop = this.$refs.terminalBody.scrollHeight;
+                        }
+                    });
+                },
+
+                clearTerminal() {
+                    this.terminalLogs = [];
+                },
+
+                async toggleTerminal(enableState = null) {
+                    const target = enableState !== null ? enableState : !this.terminalEnabled;
+                    this.loading = true;
+                    try {
+                        const res = await this.apiReq({
+                            action: 'toggle_terminal',
+                            enabled: target ? '1' : '0'
+                        });
+                        if (res && res.success) {
+                            this.terminalEnabled = !!res.terminal_enabled;
+                            window.haptic('success');
+                            window.uiAlert(this.terminalEnabled ? 'Terminal access enabled.' : 'Terminal access disabled.');
+                        } else {
+                            window.uiAlert('Failed to toggle terminal: ' + (res?.error || 'Unknown error'));
+                        }
+                    } catch(e) {
+                        window.uiAlert('Network error while toggling terminal.');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                navigateHistory(dir) {
+                    if (this.terminalHistory.length === 0) return;
+                    if (dir === 'up') {
+                        if (this.terminalHistoryIdx < this.terminalHistory.length - 1) {
+                            this.terminalHistoryIdx++;
+                        }
+                    } else if (dir === 'down') {
+                        if (this.terminalHistoryIdx > 0) {
+                            this.terminalHistoryIdx--;
+                        } else {
+                            this.terminalHistoryIdx = -1;
+                            this.terminalInput = '';
+                            return;
+                        }
+                    }
+                    if (this.terminalHistoryIdx >= 0) {
+                        const rev = [...this.terminalHistory].reverse();
+                        this.terminalInput = rev[this.terminalHistoryIdx] || '';
+                    }
+                },
+
+                runQuickCmd(cmd) {
+                    this.terminalInput = cmd;
+                    this.runTerminalCommand();
+                },
+
+                async runTerminalCommand() {
+                    const cmd = (this.terminalInput || '').trim();
+                    if (!cmd || this.terminalLoading) return;
+
+                    // Add to command history
+                    this.terminalHistory.push(cmd);
+                    if (this.terminalHistory.length > 50) this.terminalHistory.shift();
+                    this.terminalHistoryIdx = -1;
+
+                    // Echo command to log
+                    this.terminalLogs.push({
+                        type: 'cmd',
+                        cwd: this.terminalCwd,
+                        text: '$ ' + cmd
+                    });
+                    this.terminalInput = '';
+                    this.terminalLoading = true;
+                    this.scrollTerminal();
+
+                    if (cmd === 'clear' || cmd === 'cls') {
+                        this.terminalLogs = [];
+                        this.terminalLoading = false;
+                        return;
+                    }
+
+                    try {
+                        const res = await this.apiReq({
+                            action: 'terminal_exec',
+                            cmd: cmd,
+                            cwd: this.terminalCwd
+                        });
+
+                        if (res) {
+                            if (res.cwd) {
+                                this.terminalCwd = res.cwd;
+                            }
+                            if (res.stdout) {
+                                this.terminalLogs.push({ type: 'stdout', text: res.stdout });
+                            }
+                            if (res.stderr) {
+                                this.terminalLogs.push({ type: 'stderr', text: res.stderr });
+                            }
+                            if (res.error && !res.stdout && !res.stderr) {
+                                this.terminalLogs.push({ type: 'error', text: res.error });
+                            }
+                            if (typeof res.exit_code !== 'undefined' && res.exit_code !== 0) {
+                                this.terminalLogs.push({ type: 'info', text: '[Process completed with exit code ' + res.exit_code + ']' });
+                            }
+                            if (res.success && (cmd.startsWith('mkdir') || cmd.startsWith('touch') || cmd.startsWith('rm') || cmd.startsWith('git pull') || cmd.startsWith('mv') || cmd.startsWith('cp'))) {
+                                // Automatically refresh directory view if file structure changed
+                                this.fetchFiles(this.currentPath);
+                            }
+                        } else {
+                            this.terminalLogs.push({ type: 'error', text: 'Error: No response or execution failed.' });
+                        }
+                    } catch(e) {
+                        this.terminalLogs.push({ type: 'error', text: 'Error: ' + (e.message || e) });
+                    } finally {
+                        this.terminalLoading = false;
+                        this.scrollTerminal();
+                        this.$nextTick(() => {
+                            if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
+                        });
+                    }
+                },
+
                 async fetchFiles(path = '/') {
                     let res = await this.apiReq({ ajax: 'files', path: path }, 'GET');
                     if (res && res.success) {
@@ -2038,8 +2476,9 @@ window.switchApp = function(url) {
                 },
 
                 async createFolder() {
-                    if (!this.newFolderName) return;
-                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    let folderName = (this.newFolderName || '').trim().replace(/^\/+|\/+$/g, '');
+                    if (!folderName) return;
+                    let target = this.currentPath === '/' ? '/' + folderName : this.currentPath.replace(/\/+$/, '') + '/' + folderName;
                     let res = await this.apiReq({ action: 'mkdir', dir: target });
                     if (res && res.success) {
                         this.showMkdir = false;
@@ -2049,8 +2488,9 @@ window.switchApp = function(url) {
                 },
 
                 async createFile() {
-                    if (!this.newFolderName) return;
-                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    let fileName = (this.newFolderName || '').trim().replace(/^\/+|\/+$/g, '');
+                    if (!fileName) return;
+                    let target = this.currentPath === '/' ? '/' + fileName : this.currentPath.replace(/\/+$/, '') + '/' + fileName;
                     // Provide empty content to create file using logic from write
                     let res = await this.apiReq({ action: 'write', file: target, content: btoa('') });
                     if (res && res.success) {
@@ -2301,6 +2741,7 @@ window.switchApp = function(url) {
             <div style="padding: 0 1.5rem; border-bottom: 1px solid var(--border);">
                 <div class="tabs" style="margin-bottom: 0;">
                     <div class="tab" :class="subTab === 'mcp' ? 'active' : ''" @click="subTab = 'mcp'">AI & MCP Permissions</div>
+                    <div class="tab" :class="subTab === 'terminal' ? 'active' : ''" @click="subTab = 'terminal'">Terminal Access</div>
                     <div class="tab" :class="subTab === 'update' ? 'active' : ''" @click="subTab = 'update'">System Auto-Update</div>
                 </div>
             </div>
@@ -2396,6 +2837,52 @@ window.switchApp = function(url) {
                     <button @click="saveMcpConfig" class="btn btn-primary" style="margin-top: 1rem;">Save Permissions</button>
                 </div>
 
+                <!-- Terminal Tab -->
+                <div x-show="subTab === 'terminal'" class="flex flex-col gap-4">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Configure command line execution and Web Terminal access for administrators and AI agents.
+                    </p>
+
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.25rem;">
+                        <div class="flex items-center justify-between" style="gap: 1rem; flex-wrap: wrap;">
+                            <div>
+                                <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 0.25rem;">Web & API Terminal Access</h4>
+                                <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 0;">
+                                    When enabled, administrators can execute shell commands via the Web UI terminal and authenticated AI clients can call the <code style="color:var(--accent);">execute_command</code> tool.
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="stat-badge" :style="terminalEnabled ? 'background: rgba(34, 211, 238, 0.15); color: var(--accent); border-color: rgba(34,211,238,0.3);' : 'background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239,68,68,0.3);'" x-text="terminalEnabled ? 'ENABLED' : 'DISABLED'"></span>
+                                <button type="button" @click="toggleTerminal()" class="btn" :class="terminalEnabled ? 'btn-ghost' : 'btn-primary'" style="padding: 0.45rem 1rem; font-size: 0.8rem;" x-text="terminalEnabled ? 'Disable Terminal' : 'Enable Terminal'"></button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);" x-show="!procOpenAvailable">
+                            <div style="color: var(--danger); font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <span>Note: <code style="color:#fff;">proc_open()</code> is disabled in php.ini on this server. Shell commands cannot run until enabled.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.25rem;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--accent);">Direct Terminal API Access</h4>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            Execute terminal commands remotely via HTTP POST request with your API Key:
+                        </p>
+                        <pre style="background: #000; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-family: monospace; font-size: 0.7rem; color: #fff; overflow-x: auto; white-space: pre; margin: 0;">curl -X POST "<span x-text="mcpBaseUrl"></span>?action=api" \
+  -H "X-API-KEY: <?php echo htmlspecialchars(API_KEY); ?>" \
+  --data-urlencode "tool=execute_command" \
+  --data-urlencode "command=uptime"</pre>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-start; gap: 0.5rem;">
+                        <button type="button" @click="showMcpModal = false; openTerminal()" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.8rem;">
+                            Open Web Terminal &rarr;
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Updates Tab -->
                 <div x-show="subTab === 'update'" class="flex flex-col gap-4">
                     <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; text-align: center;">
@@ -2452,6 +2939,94 @@ window.switchApp = function(url) {
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--border); border-left: none; flex-direction: row; min-width: unset; max-width: unset; justify-content: flex-end;">
                 <button @click="showQR = false" class="btn btn-primary" style="width: auto;">DONE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Web Terminal Modal -->
+    <div class="modal-overlay" x-show="showTerminal" x-cloak x-transition>
+        <div class="modal-card modal-panel" style="width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;" @click.outside="showTerminal = false">
+            <div class="modal-header" style="background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid var(--border);">
+                <div class="flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <h3 style="font-weight: 700; font-size: 1rem; color: #fff;">ServerLuxe Terminal</h3>
+                    <span class="stat-badge" :style="terminalEnabled ? 'background: rgba(34, 211, 238, 0.15); color: var(--accent); border-color: rgba(34,211,238,0.3); font-size: 0.65rem;' : 'background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239,68,68,0.3); font-size: 0.65rem;'" x-text="terminalEnabled ? 'ONLINE' : 'DISABLED'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="toggleTerminal()" class="btn btn-ghost" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" :style="terminalEnabled ? 'color: var(--danger);' : 'color: var(--accent);'" x-text="terminalEnabled ? 'Disable' : 'Enable'"></button>
+                    <button type="button" @click="clearTerminal()" class="btn btn-ghost" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Clear Output">Clear</button>
+                    <button type="button" @click="showTerminal = false" class="btn btn-ghost" style="padding: 0.25rem 0.5rem; border: none; font-size: 1.25rem; line-height: 1;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Terminal Warning Banner if disabled -->
+            <div x-show="!terminalEnabled" style="background: rgba(239, 68, 68, 0.15); border-bottom: 1px solid rgba(239, 68, 68, 0.3); padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #fca5a5;">
+                <div class="flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Terminal is currently disabled. Click <strong>Enable</strong> to allow shell execution.</span>
+                </div>
+                <button type="button" @click="toggleTerminal(true)" class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; background: var(--danger); border-color: var(--danger); color: #fff;">Enable Now</button>
+            </div>
+
+            <!-- Quick Commands Bar -->
+            <div style="background: rgba(10, 15, 30, 0.8); border-bottom: 1px solid var(--border); padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; flex-shrink: 0;">
+                <span style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem;">Quick:</span>
+                <button type="button" @click="runQuickCmd('pwd')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">pwd</button>
+                <button type="button" @click="runQuickCmd('ls -la')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">ls -la</button>
+                <button type="button" @click="runQuickCmd('whoami')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">whoami</button>
+                <button type="button" @click="runQuickCmd('git status')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">git status</button>
+                <button type="button" @click="runQuickCmd('uptime')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">uptime</button>
+                <button type="button" @click="runQuickCmd('php -v')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">php -v</button>
+            </div>
+
+            <!-- Terminal Output Stream -->
+            <div x-ref="terminalBody" style="flex: 1; overflow-y: auto; background: #050811; padding: 1rem; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1; user-select: text;">
+                <template x-for="(log, idx) in terminalLogs" :key="idx">
+                    <div style="margin-bottom: 0.35rem; white-space: pre-wrap; word-break: break-all;">
+                        <template x-if="log.type === 'cmd'">
+                            <div style="color: var(--accent); font-weight: 700;">
+                                <span style="color: var(--text-secondary); opacity: 0.6; font-size: 0.7rem;" x-text="log.cwd ? log.cwd + ' ' : ''"></span>
+                                <span x-text="log.text"></span>
+                            </div>
+                        </template>
+                        <template x-if="log.type === 'stdout'">
+                            <div style="color: #f1f5f9;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'stderr'">
+                            <div style="color: #f87171;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'error'">
+                            <div style="color: #ef4444; font-weight: 600;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'info'">
+                            <div style="color: #94a3b8; font-style: italic; font-size: 0.75rem;" x-text="log.text"></div>
+                        </template>
+                    </div>
+                </template>
+                <div x-show="terminalLoading" class="flex items-center gap-2" style="color: var(--accent); margin-top: 0.5rem;">
+                    <div class="spinner animate-spin" style="width: 14px; height: 14px; border: 2px solid rgba(34, 211, 238, 0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
+                    <span style="font-size: 0.75rem;">Executing command...</span>
+                </div>
+            </div>
+
+            <!-- Terminal Prompt Bar -->
+            <div style="background: rgba(15, 23, 42, 0.98); border-top: 1px solid var(--border); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <span style="font-family: monospace; font-size: 0.85rem; color: var(--accent); font-weight: 800; flex-shrink: 0;" x-text="terminalCwd.split('/').pop() || '/'">&gt;</span>
+                <span style="color: var(--text-secondary); font-family: monospace; font-size: 0.85rem;">$</span>
+                <input 
+                    type="text" 
+                    x-ref="terminalCmdInput"
+                    x-model="terminalInput" 
+                    @keydown.enter.prevent="runTerminalCommand"
+                    @keydown.up.prevent="navigateHistory('up')"
+                    @keydown.down.prevent="navigateHistory('down')"
+                    :disabled="terminalLoading"
+                    placeholder="Enter shell command (e.g. ls -la, git status, cd <folder>)..." 
+                    style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.85rem; padding: 0.25rem 0.5rem;"
+                >
+                <button type="button" @click="runTerminalCommand" class="btn btn-primary" :disabled="terminalLoading || !terminalInput.trim()" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;">
+                    Run
+                </button>
             </div>
         </div>
     </div>
@@ -2587,15 +3162,29 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
                 echo json_encode(['success' => (bool)$res, 'error' => $res ? null : "Could not rename."]);
                 break;
             case 'mkdir':
-                $dir = $_POST['dir'] ?? '';
+                $dir = trim($_POST['dir'] ?? '');
+                if (empty($dir)) {
+                    echo json_encode(['success' => false, 'error' => 'Folder path cannot be empty.']);
+                    break;
+                }
                 $validation = validate_path($base_dir, $dir);
                 if (!$validation['valid']) {
-                    echo json_encode(['error' => 'Invalid path']);
+                    echo json_encode(['success' => false, 'error' => 'Invalid path or directory traversal detected.']);
                     break;
                 }
                 $target = $validation['path'];
+                if (is_dir($target)) {
+                    echo json_encode(['success' => false, 'error' => 'Directory already exists.']);
+                    break;
+                }
                 $res = @mkdir($target, 0755, true);
-                echo json_encode(['success' => (bool)$res, 'error' => $res ? null : "Could not create directory."]);
+                if (!$res) {
+                    $err = error_get_last();
+                    $errMsg = ($err && !empty($err['message'])) ? $err['message'] : "Could not create directory. Check server permissions.";
+                    echo json_encode(['success' => false, 'error' => $errMsg]);
+                } else {
+                    echo json_encode(['success' => true, 'error' => null]);
+                }
                 break;
             case 'upload':
                 if (!empty($_FILES['file'])) {
@@ -2761,6 +3350,49 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
                     $res = @shell_exec("unzip -o ".escapeshellarg($target)." -d ".escapeshellarg(dirname($target)));
                     echo json_encode(['success' => !empty($res), 'error' => empty($res) ? 'Unzip failed or unsupported.' : null]);
                 }
+                break;
+            case 'terminal_exec':
+                if (!is_terminal_enabled()) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Terminal access is disabled on this server. Please enable it in the MCP & Terminal panel or set ENABLE_TERMINAL=true in .env.'
+                    ]);
+                    break;
+                }
+                $cmd = $_POST['cmd'] ?? $_POST['command'] ?? '';
+                $cwd = $_POST['cwd'] ?? null;
+                $timeout = isset($_POST['timeout']) ? (int)$_POST['timeout'] : 30;
+
+                // If user specifies a relative cwd or path in the file manager, validate it
+                if (!empty($cwd)) {
+                    $cwd_val = validate_path($base_dir, $cwd);
+                    if ($cwd_val['valid'] && is_dir($cwd_val['path'])) {
+                        $cwd = $cwd_val['path'];
+                    } else {
+                        $cwd = $base_dir;
+                    }
+                } else {
+                    $cwd = $base_dir;
+                }
+
+                $run = run_terminal_command($cmd, $cwd, $timeout);
+                echo json_encode([
+                    'success' => true,
+                    'stdout' => $run['stdout'],
+                    'stderr' => $run['stderr'],
+                    'exit_code' => $run['exit_code'],
+                    'cwd' => $run['cwd'],
+                    'error' => $run['error'] ?? null
+                ]);
+                break;
+            case 'toggle_terminal':
+                $enabled = !empty($_POST['enabled']) && ($_POST['enabled'] === '1' || $_POST['enabled'] === 'true');
+                $res = set_terminal_enabled($enabled);
+                echo json_encode([
+                    'success' => (bool)$res,
+                    'terminal_enabled' => is_terminal_enabled(),
+                    'error' => $res ? null : 'Failed to save terminal setting to mcp_config.json'
+                ]);
                 break;
             default: echo json_encode(['error' => "Unknown action: $action"]);
         }

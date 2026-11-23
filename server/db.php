@@ -50,7 +50,7 @@ load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'SQLuxe');
-define('VERSION', '1.4.3');
+define('VERSION', '1.5.0');
 
 // DEFAULTS
 define('DEFAULT_HOST', $_ENV['DEFAULT_HOST'] ?? 'localhost');
@@ -77,10 +77,24 @@ if (empty($_SESSION['csrf_token'])) {
 
 function is_api_request() {
     $provided_key = $_SERVER['HTTP_X_API_KEY'] ?? $_POST['api_key'] ?? $_GET['api_key'] ?? '';
+    if (empty($provided_key) && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        if (preg_match('/Bearer\s+(.*)$/i', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
+            $provided_key = trim($matches[1]);
+        }
+    }
+    if (empty($provided_key) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $k => $v) {
+            if (strcasecmp($k, 'X-API-KEY') === 0) {
+                $provided_key = $v;
+                break;
+            }
+        }
+    }
     
     // 1. Check API Key if defined on server
     if (!empty(API_KEY)) {
-        if (hash_equals(API_KEY, $provided_key)) {
+        if (!empty($provided_key) && hash_equals(API_KEY, $provided_key)) {
             header('X-API-Auth-Method: API-KEY');
             return true;
         }
@@ -106,15 +120,25 @@ function is_api_request() {
 }
 
 function validate_csrf() {
-    if (is_api_request()) return; // API requests are authenticated by API_KEY, skip CSRF
+    if (is_api_request()) return true; // API requests are authenticated by API_KEY, skip CSRF
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (empty($token) && function_exists('getallheaders')) {
+            $headers = getallheaders();
+            foreach ($headers as $k => $v) {
+                if (strcasecmp($k, 'X-CSRF-TOKEN') === 0) {
+                    $token = $v;
+                    break;
+                }
+            }
+        }
         if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
             header('Content-Type: application/json');
             echo json_encode(['error' => "CSRF token mismatch or session expired."]);
             exit;
         }
     }
+    return true;
 }
 
 function validate_write_access() {

@@ -1,4 +1,7 @@
 {
   "databases": {},
-  "folders": {}
+  "folders": {},
+  "terminal": {
+    "enabled": false
+  }
 }

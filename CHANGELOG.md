@@ -4,6 +4,27 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.5.0] - 2026-11-23
+### Added
+- **Web & API Terminal Access**:
+  - Full interactive terminal emulator embedded in FileLuxe (`fm.php`) Web interface and mobile/web client (`fm.html`).
+  - Terminal features include streaming log output, exit code detection, command history navigation (Up/Down arrow keys), quick actions (`pwd`, `ls -la`, `whoami`, `git status`, `uptime`, `php -v`), clear command, and live process execution status.
+  - Automatic directory tracking and relative `cd` support across HTTP requests.
+  - Direct shell tool `execute_command` (aliases: `terminal`, `run_command`) added to Model Context Protocol (MCP) `tools/list` schema and REST API (`?action=api&tool=execute_command&command=...`).
+  - Non-blocking execution using `proc_open` with stdout/stderr pipe capturing and configurable timeout safeguards (default 30s, max 120s).
+- **Web Terminal Enable / Disable Control**:
+  - Dedicated **Terminal Access** tab in the **MCP & Auto-Update Panel** (`fm.php`) allowing administrators to instantly toggle terminal availability with one click.
+  - Safe default: disabled out-of-the-box until enabled in the Web UI or via `ENABLE_TERMINAL=true` in `.env`.
+  - Stored persistently in `server/mcp_config.json` (`terminal.enabled`).
+  - Status indicators and enable/disable button directly within the Terminal modal header.
+
+### Fixed
+- **API Authentication & CSRF Validation in FileLuxe (`fm.php`)**: Separated stateless API key authentication (`is_api_key_request()`) from session checks. Stateless API requests authenticated via `X-API-KEY` header, `$_POST['api_key']`, `$_GET['api_key']`, or `Authorization: Bearer` now reliably bypass CSRF validation without returning "CSRF validation failed: session not authenticated". Added `getallheaders()` case-insensitive checks for `X-API-KEY` and `X-CSRF-TOKEN` to prevent failures behind reverse proxies and Web Application Firewalls.
+- **CSRF Token Validation Return Value**: Ensured `validate_csrf_token()` returns boolean `true` on successful validation.
+- **Enhanced Directory Path Validation (`validate_path`)**: Fixed path validation when creating directories: `validate_path()` now recursively inspects existing ancestor directories so multi-level folder creation doesn't fail with "Invalid path", and fixed root path normalization when `$base_dir` is `/`.
+- **UI & App Folder Creation Sanitization**: Sanitized folder and file names by trimming whitespace and leading/trailing slashes in `fm.php` and mobile/web app (`fm.html`). In `fm.php`'s UI `apiReq`, ensure POST requests target `window.location.pathname` so stale query parameters (e.g. `?action=...`) from previous operations are not preserved.
+- **File Manager API `create_folder` Tool**: Implemented `create_folder` (with `mkdir` alias) in `execute_fm_tool()` and registered it in MCP `tools/list` schema so AI agents (MCP) and REST API callers can create directories with appropriate folder permission enforcement and clear error reporting.
+
 ## [1.4.3] - 2026-09-12
 ### Fixed
 - **CSRF Token Validation Fix in FileLuxe (`fm.php`)**: Fixed issue where `validate_csrf_token()` was called with `if (!validate_csrf_token())` in AJAX file actions handler; since `validate_csrf_token()` returns `void` on success and exits on failure, the negation condition was always truthy and blocked file operations (delete, rename, etc.) with "Invalid CSRF token".

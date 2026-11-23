@@ -86,8 +86,12 @@ Use this to let your AI view, read, write, or delete files in permitted director
     *   *Arguments*: `path` (string, required)
 *   **`write_file`**: Writes or creates text content for a file.
     *   *Arguments*: `path` (string, required), `content` (string, required)
+*   **`create_folder`**: Creates a new directory or folder.
+    *   *Arguments*: `path` (string, required)
 *   **`delete_file`**: Deletes a file or folder.
     *   *Arguments*: `path` (string, required)
+*   **`execute_command`**: Runs shell/terminal command on the server (requires Terminal enabled in Web panel or `ENABLE_TERMINAL=true` in `.env`).
+    *   *Arguments*: `command` (string, required), `cwd` (string, optional), `timeout` (integer, optional)
 
 ---
 

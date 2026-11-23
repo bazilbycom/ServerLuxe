@@ -488,6 +488,15 @@
                                 </svg>
                                 <span class="btn-text">Remote</span>
                             </button>
+                            <button @click="openTerminal()" class="btn-group-item" title="Terminal"
+                                style="color: var(--accent);">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="4 17 10 11 4 5"></polyline>
+                                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                                </svg>
+                                <span class="btn-text">Terminal</span>
+                            </button>
                             <button @click="fetchFiles(currentPath)" class="btn-group-item" title="Refresh"
                                 style="border-right: none;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -931,6 +940,83 @@
         </div>
     </div>
 
+    <!-- Web Terminal Modal -->
+    <div class="modal-overlay" x-show="showTerminal" x-cloak x-transition>
+        <div class="modal-card modal-panel" style="width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;" @click.outside="showTerminal = false">
+            <div class="modal-header" style="background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid var(--border);">
+                <div class="flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <h3 style="font-weight: 700; font-size: 1rem; color: #fff;">ServerLuxe Terminal</h3>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="clearTerminal()" class="btn btn-ghost" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Clear Output">Clear</button>
+                    <button type="button" @click="showTerminal = false" class="btn btn-ghost" style="padding: 0.25rem 0.5rem; border: none; font-size: 1.25rem; line-height: 1;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Quick Commands Bar -->
+            <div style="background: rgba(10, 15, 30, 0.8); border-bottom: 1px solid var(--border); padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; flex-shrink: 0;">
+                <span style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem;">Quick:</span>
+                <button type="button" @click="runQuickCmd('pwd')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">pwd</button>
+                <button type="button" @click="runQuickCmd('ls -la')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">ls -la</button>
+                <button type="button" @click="runQuickCmd('whoami')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">whoami</button>
+                <button type="button" @click="runQuickCmd('git status')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">git status</button>
+                <button type="button" @click="runQuickCmd('uptime')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">uptime</button>
+                <button type="button" @click="runQuickCmd('php -v')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">php -v</button>
+            </div>
+
+            <!-- Terminal Output Stream -->
+            <div x-ref="terminalBody" style="flex: 1; overflow-y: auto; background: #050811; padding: 1rem; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1; user-select: text;">
+                <template x-for="(log, idx) in terminalLogs" :key="idx">
+                    <div style="margin-bottom: 0.35rem; white-space: pre-wrap; word-break: break-all;">
+                        <template x-if="log.type === 'cmd'">
+                            <div style="color: var(--accent); font-weight: 700;">
+                                <span style="color: var(--text-secondary); opacity: 0.6; font-size: 0.7rem;" x-text="log.cwd ? log.cwd + ' ' : ''"></span>
+                                <span x-text="log.text"></span>
+                            </div>
+                        </template>
+                        <template x-if="log.type === 'stdout'">
+                            <div style="color: #f1f5f9;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'stderr'">
+                            <div style="color: #f87171;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'error'">
+                            <div style="color: #ef4444; font-weight: 600;" x-text="log.text"></div>
+                        </template>
+                        <template x-if="log.type === 'info'">
+                            <div style="color: #94a3b8; font-style: italic; font-size: 0.75rem;" x-text="log.text"></div>
+                        </template>
+                    </div>
+                </template>
+                <div x-show="terminalLoading" class="flex items-center gap-2" style="color: var(--accent); margin-top: 0.5rem;">
+                    <div class="spinner animate-spin" style="width: 14px; height: 14px; border: 2px solid rgba(34, 211, 238, 0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
+                    <span style="font-size: 0.75rem;">Executing command...</span>
+                </div>
+            </div>
+
+            <!-- Terminal Prompt Bar -->
+            <div style="background: rgba(15, 23, 42, 0.98); border-top: 1px solid var(--border); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <span style="font-family: monospace; font-size: 0.85rem; color: var(--accent); font-weight: 800; flex-shrink: 0;" x-text="terminalCwd ? terminalCwd.split('/').pop() || '/' : '/'">&gt;</span>
+                <span style="color: var(--text-secondary); font-family: monospace; font-size: 0.85rem;">$</span>
+                <input 
+                    type="text" 
+                    x-ref="terminalCmdInput"
+                    x-model="terminalInput" 
+                    @keydown.enter.prevent="runTerminalCommand"
+                    @keydown.up.prevent="navigateHistory('up')"
+                    @keydown.down.prevent="navigateHistory('down')"
+                    :disabled="terminalLoading"
+                    placeholder="Enter shell command (e.g. ls -la, git status, cd <folder>)..." 
+                    style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.85rem; padding: 0.25rem 0.5rem;"
+                >
+                <button type="button" @click="runTerminalCommand" class="btn btn-primary" :disabled="terminalLoading || !terminalInput.trim()" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;">
+                    Run
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Global hidden inputs -->
 
     <input type="file" id="importNodesInput" @change="importNodes($event)" style="display:none;" accept=".json">
@@ -941,7 +1027,7 @@
         window.addEventListener('hardwareBackPress', (e) => {
             const app = document.querySelector('[x-data="ftpApp"]').__x.$data;
             if (app) {
-                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner) {
+                if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner || app.showTerminal) {
                     e.preventDefault();
                     app.showAddServer = false;
                     app.openServerManager = false;
@@ -949,6 +1035,7 @@
                     app.showNewFile = false;
                     app.activeItem = null;
                     app.showEditor = false;
+                    app.showTerminal = false;
                     app.stopQRScanner(); // Ensure scanner stops
                 } else if (app.currentPath && app.currentPath !== '/') {
                     e.preventDefault();
@@ -985,6 +1072,14 @@
                 openServerManager: false,
                 showQRScanner: false,
                 qrScanStream: null,
+                showTerminal: false,
+                terminalLoading: false,
+                terminalInput: '',
+                terminalLogs: [],
+                terminalHistory: [],
+                terminalHistoryIdx: -1,
+                terminalCwd: '',
+                terminalEnabled: true,
 
 
                 get pathSegments() {
@@ -1296,12 +1391,21 @@
 
                         if (method === 'GET') {
                             Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+                            if (this.currentServer.apiKey) {
+                                url.searchParams.append('api_key', this.currentServer.apiKey);
+                            }
                         } else {
                             if (isFormData) {
                                 body = params; // params is already FormData
+                                if (this.currentServer.apiKey && !body.has('api_key')) {
+                                    body.append('api_key', this.currentServer.apiKey);
+                                }
                             } else {
                                 body = new FormData();
                                 Object.keys(params).forEach(k => body.append(k, params[k]));
+                                if (this.currentServer.apiKey) {
+                                    body.append('api_key', this.currentServer.apiKey);
+                                }
                             }
                         }
 
@@ -1364,8 +1468,9 @@
                 },
 
                 async createFolder() {
-                    if (!this.newFolderName) return;
-                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    let folderName = (this.newFolderName || '').trim().replace(/^\/+|\/+$/g, '');
+                    if (!folderName) return;
+                    let target = this.currentPath === '/' ? '/' + folderName : this.currentPath.replace(/\/+$/, '') + '/' + folderName;
                     let res = await this.apiReq({ action: 'mkdir', dir: target });
                     if (res && res.success) {
                         this.showMkdir = false;
@@ -1375,8 +1480,9 @@
                 },
 
                 async createFile() {
-                    if (!this.newFolderName) return;
-                    let target = this.currentPath === '/' ? '/' + this.newFolderName : this.currentPath + '/' + this.newFolderName;
+                    let fileName = (this.newFolderName || '').trim().replace(/^\/+|\/+$/g, '');
+                    if (!fileName) return;
+                    let target = this.currentPath === '/' ? '/' + fileName : this.currentPath.replace(/\/+$/, '') + '/' + fileName;
                     // Provide empty content to create file using logic from write
                     let res = await this.apiReq({ action: 'write', file: target, content: btoa('') });
                     if (res && res.success) {
@@ -1584,6 +1690,128 @@
                     document.body.appendChild(form);
                     form.submit();
                     document.body.removeChild(form);
+                },
+
+                // Terminal Methods
+                openTerminal() {
+                    if (!this.currentServer) {
+                        return window.uiAlert("Please connect to a server first.");
+                    }
+                    this.showTerminal = true;
+                    if (!this.terminalCwd) {
+                        this.terminalCwd = this.currentPath || '/';
+                    }
+                    if (this.terminalLogs.length === 0) {
+                        this.terminalLogs.push({
+                            type: 'info',
+                            text: 'Connected to ' + (this.currentServer.name || 'Server') + ' Terminal.\nWorking directory: ' + (this.terminalCwd || '/')
+                        });
+                    }
+                    this.$nextTick(() => {
+                        if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
+                        this.scrollTerminal();
+                    });
+                },
+
+                scrollTerminal() {
+                    this.$nextTick(() => {
+                        if (this.$refs.terminalBody) {
+                            this.$refs.terminalBody.scrollTop = this.$refs.terminalBody.scrollHeight;
+                        }
+                    });
+                },
+
+                clearTerminal() {
+                    this.terminalLogs = [];
+                },
+
+                navigateHistory(dir) {
+                    if (this.terminalHistory.length === 0) return;
+                    if (dir === 'up') {
+                        if (this.terminalHistoryIdx < this.terminalHistory.length - 1) {
+                            this.terminalHistoryIdx++;
+                        }
+                    } else if (dir === 'down') {
+                        if (this.terminalHistoryIdx > 0) {
+                            this.terminalHistoryIdx--;
+                        } else {
+                            this.terminalHistoryIdx = -1;
+                            this.terminalInput = '';
+                            return;
+                        }
+                    }
+                    if (this.terminalHistoryIdx >= 0) {
+                        const rev = [...this.terminalHistory].reverse();
+                        this.terminalInput = rev[this.terminalHistoryIdx] || '';
+                    }
+                },
+
+                runQuickCmd(cmd) {
+                    this.terminalInput = cmd;
+                    this.runTerminalCommand();
+                },
+
+                async runTerminalCommand() {
+                    const cmd = (this.terminalInput || '').trim();
+                    if (!cmd || this.terminalLoading) return;
+
+                    this.terminalHistory.push(cmd);
+                    if (this.terminalHistory.length > 50) this.terminalHistory.shift();
+                    this.terminalHistoryIdx = -1;
+
+                    this.terminalLogs.push({
+                        type: 'cmd',
+                        cwd: this.terminalCwd,
+                        text: '$ ' + cmd
+                    });
+                    this.terminalInput = '';
+                    this.terminalLoading = true;
+                    this.scrollTerminal();
+
+                    if (cmd === 'clear' || cmd === 'cls') {
+                        this.terminalLogs = [];
+                        this.terminalLoading = false;
+                        return;
+                    }
+
+                    try {
+                        const res = await this.apiReq({
+                            action: 'terminal_exec',
+                            cmd: cmd,
+                            cwd: this.terminalCwd
+                        });
+
+                        if (res) {
+                            if (res.cwd) {
+                                this.terminalCwd = res.cwd;
+                            }
+                            if (res.stdout) {
+                                this.terminalLogs.push({ type: 'stdout', text: res.stdout });
+                            }
+                            if (res.stderr) {
+                                this.terminalLogs.push({ type: 'stderr', text: res.stderr });
+                            }
+                            if (res.error && !res.stdout && !res.stderr) {
+                                this.terminalLogs.push({ type: 'error', text: res.error });
+                            }
+                            if (typeof res.exit_code !== 'undefined' && res.exit_code !== 0) {
+                                this.terminalLogs.push({ type: 'info', text: '[Process completed with exit code ' + res.exit_code + ']' });
+                            }
+                            if (res.success && (cmd.startsWith('mkdir') || cmd.startsWith('touch') || cmd.startsWith('rm') || cmd.startsWith('git pull') || cmd.startsWith('mv') || cmd.startsWith('cp'))) {
+                                this.fetchFiles(this.currentPath);
+                            }
+                        } else {
+                            this.terminalLogs.push({ type: 'error', text: 'Error: No response or execution failed.' });
+                        }
+                    } catch(e) {
+                        this.terminalLogs.push({ type: 'error', text: 'Error: ' + (e.message || e) });
+                    } finally {
+                        this.terminalLoading = false;
+                        this.scrollTerminal();
+                        this.$nextTick(() => {
+                            if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
+                        });
+                    }
                 }
             }));
         });
