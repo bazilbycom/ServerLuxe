@@ -4,6 +4,26 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.5.2] - 2026-11-23
+### Added
+- **Direct Path Editing & Go to Folder/File**:
+  - Added an inline address/path editor to the file breadcrumb header in both FileLuxe (`fm.php`) and ServerLuxe app (`fm.html`).
+  - Clicking the edit button (or pressing `Ctrl+G` / `Cmd+G`) toggles an address input bar prefilled with the current path.
+  - Supports absolute paths, relative paths, parent traversal (`..`), and home directory shortcuts (`~`).
+  - Backend `ajax=resolve_path` dynamically validates and distinguishes folders from files.
+  - When entering a **directory path**: immediately navigates to that folder.
+  - When entering a **file path**: immediately navigates to the file's parent folder and opens the file directly in the code/text editor.
+
+### Fixed
+- **File Download CSRF Token Mismatch**:
+  - Resolved `{"error":"CSRF token mismatch or session expired."}` when downloading files.
+  - Attached `csrf_token` to dynamic download forms in `server/fm.php`.
+  - Added `api_key` payload in `app/www/fm.html` download forms for authenticated remote server access.
+  - Enhanced `validate_csrf_token()` to accept tokens from headers, POST, GET, and REQUEST parameters.
+  - Cleaned output buffers (`ob_end_clean`) before streaming file octet-streams to prevent download corruption.
+
+---
+
 ## [1.5.1] - 2026-11-23
 ### Added
 - **Native Terminal App Appearance & Operations**:

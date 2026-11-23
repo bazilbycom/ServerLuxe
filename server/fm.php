@@ -51,7 +51,7 @@ function load_env($path) {
 load_env(__DIR__ . '/.env');
 
 // Configuration & Constants
-define('VERSION', '1.5.1');
+define('VERSION', '1.5.2');
 define('API_KEY', $_ENV['API_KEY'] ?? '2026');
 define('MASTER_PASS', $_ENV['MASTER_PASS'] ?? '');
 define('DB_FILE', $_ENV['DB_FILE'] ?? 'db.php');
@@ -219,7 +219,7 @@ function validate_csrf_token() {
         exit;
     }
 
-    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? $_GET['csrf_token'] ?? $_REQUEST['csrf_token'] ?? '';
     if (empty($token) && function_exists('getallheaders')) {
         $headers = getallheaders();
         foreach ($headers as $k => $v) {
@@ -1842,17 +1842,41 @@ window.switchApp = function(url) {
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
                 <div class="header-info" style="gap: 0.4rem; margin-top: 1px; display: flex; align-items: center; min-width: 0; flex: 1;">
-                    <span class="header-title mobile-hide" style="font-size: 0.7rem; opacity: 0.4; text-transform: uppercase; letter-spacing: 0.05em;">Server</span>
-                    <span class="header-separator mobile-hide" style="margin: 0; opacity: 0.3;">/</span>
-                    <div class="flex items-center gap-1" style="display:flex; flex-shrink: 0;">
-                        <span class="header-subtitle" @click="navigateTo('/')" style="cursor:pointer; opacity:1; color: var(--accent); font-weight: 800; background: rgba(34, 211, 238, 0.1); padding: 0.15rem 0.6rem; border-radius: 2rem; font-size: 0.75rem;" x-text="rootName"></span>
-                        <template x-for="(segment, index) in pathSegments">
-                            <span style="display:inline-flex; align-items:center; gap:0.25rem;">
-                                <span style="opacity:0.3;font-size:0.7rem;">/</span>
-                                <span class="header-subtitle" @click="navigateToSegment(index)" x-text="segment" style="cursor:pointer; background: rgba(255,255,255,0.05); padding: 0.15rem 0.6rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 600;"></span>
-                            </span>
-                        </template>
-                    </div>
+                    <template x-if="!pathEditing">
+                        <div class="flex items-center gap-1" style="display: flex; align-items: center; flex: 1; min-width: 0; overflow-x: auto;">
+                            <span class="header-title mobile-hide" style="font-size: 0.7rem; opacity: 0.4; text-transform: uppercase; letter-spacing: 0.05em;">Server</span>
+                            <span class="header-separator mobile-hide" style="margin: 0; opacity: 0.3;">/</span>
+                            <div class="flex items-center gap-1" style="display:flex; flex-shrink: 0;">
+                                <span class="header-subtitle" @click="navigateTo('/')" style="cursor:pointer; opacity:1; color: var(--accent); font-weight: 800; background: rgba(34, 211, 238, 0.1); padding: 0.15rem 0.6rem; border-radius: 2rem; font-size: 0.75rem;" x-text="rootName"></span>
+                                <template x-for="(segment, index) in pathSegments" :key="index">
+                                    <span style="display:inline-flex; align-items:center; gap:0.25rem;">
+                                        <span style="opacity:0.3;font-size:0.7rem;">/</span>
+                                        <span class="header-subtitle" @click="navigateToSegment(index)" x-text="segment" style="cursor:pointer; background: rgba(255,255,255,0.05); padding: 0.15rem 0.6rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 600;"></span>
+                                    </span>
+                                </template>
+                            </div>
+                            <button type="button" @click="enablePathEdit()" class="btn btn-ghost" style="padding: 0.2rem 0.45rem; border: none; opacity: 0.6; margin-left: 0.25rem; flex-shrink: 0;" title="Edit Path / Go to file or folder (Ctrl+G)" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                        </div>
+                    </template>
+                    <template x-if="pathEditing">
+                        <form @submit.prevent="gotoPath()" class="flex items-center gap-1" style="flex: 1; min-width: 0; max-width: 650px;">
+                            <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" style="position: absolute; left: 10px; pointer-events: none;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                <input 
+                                    type="text" 
+                                    x-ref="pathEditInput"
+                                    x-model="pathInput" 
+                                    @keydown.escape.prevent="cancelPathEdit()"
+                                    placeholder="Enter path to folder or file (e.g. /var/www, src/index.php, ..)" 
+                                    style="width: 100%; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 4px 10px 4px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none; box-shadow: 0 0 10px rgba(34, 211, 238, 0.15);"
+                                >
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
+                            <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="padding: 4px 8px; font-size: 0.85rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" title="Cancel (Esc)">&times;</button>
+                        </form>
+                    </template>
                 </div>
             </div>
             
@@ -2197,6 +2221,8 @@ window.switchApp = function(url) {
                 showMcpModal: false,
                 mcpConfig: { databases: {}, folders: {} },
                 newMcpFolder: '',
+                pathEditing: false,
+                pathInput: '',
                 terminalEnabled: false,
                 procOpenAvailable: true,
                 showTerminal: false,
@@ -2280,6 +2306,16 @@ window.switchApp = function(url) {
                         this.buildTreeToPath(this.currentPath);
                     }
                     this.fetchFiles(this.currentPath);
+
+                    // Shortcut: Ctrl+G / Cmd+G to quickly edit path / goto folder or file
+                    window.addEventListener('keydown', (e) => {
+                        if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G') && !e.shiftKey) {
+                            if (!this.showTerminal && !this.showEditor) {
+                                e.preventDefault();
+                                this.enablePathEdit();
+                            }
+                        }
+                    });
                 },
 
                 async buildTreeToPath(path) {
@@ -2905,6 +2941,70 @@ window.switchApp = function(url) {
                     this.navigateTo('/' + parts.join('/'));
                 },
 
+                enablePathEdit() {
+                    this.pathEditing = true;
+                    this.pathInput = this.currentPath || '/';
+                    this.$nextTick(() => {
+                        if (this.$refs.pathEditInput) {
+                            this.$refs.pathEditInput.focus();
+                            this.$refs.pathEditInput.select();
+                        }
+                    });
+                },
+
+                cancelPathEdit() {
+                    this.pathEditing = false;
+                    this.pathInput = '';
+                },
+
+                async gotoPath(inputPath = null) {
+                    let p = (inputPath !== null ? inputPath : this.pathInput || '').trim();
+                    if (!p) return;
+
+                    // Handle relative paths
+                    if (!p.startsWith('/') && !p.startsWith('~') && !p.match(/^[a-zA-Z]:/)) {
+                        let base = this.currentPath || '/';
+                        p = base === '/' ? '/' + p : base + '/' + p;
+                    }
+
+                    this.loading = true;
+                    try {
+                        let res = await this.apiReq({ ajax: 'resolve_path', path: p }, 'GET');
+                        if (res && res.success) {
+                            this.pathEditing = false;
+                            if (res.type === 'directory') {
+                                await this.fetchFiles(res.path);
+                                window.haptic('success');
+                            } else if (res.type === 'file') {
+                                // Navigate to parent directory first so the file table displays context
+                                await this.fetchFiles(res.parent);
+                                // Open file directly in editor
+                                await this.inspectFileByPath(res.path, { name: res.name, size: res.size, date: res.date });
+                                window.haptic('success');
+                            }
+                        } else {
+                            // Fallback: try navigating directly via files
+                            let fetchRes = await this.apiReq({ ajax: 'files', path: p }, 'GET');
+                            if (fetchRes && fetchRes.success) {
+                                this.files = fetchRes.files;
+                                this.currentPath = fetchRes.pwd;
+                                this.pathEditing = false;
+                                window.haptic('success');
+                            } else if (fetchRes && fetchRes.is_file) {
+                                this.pathEditing = false;
+                                await this.fetchFiles(fetchRes.parent);
+                                await this.inspectFileByPath(fetchRes.file_path);
+                            } else {
+                                window.uiAlert(res?.error || fetchRes?.error || 'Path not found: ' + p);
+                            }
+                        }
+                    } catch(e) {
+                        window.uiAlert('Error resolving path: ' + (e.message || e));
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
                 formatSize(bytes) {
                     if (bytes === 0) return '0 B';
                     const k = 1024;
@@ -3100,7 +3200,7 @@ window.switchApp = function(url) {
 
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.action = window.location.href;
+                    form.action = window.location.pathname || window.location.href;
                     form.target = '_blank';
 
                     const actionInput = document.createElement('input');
@@ -3113,14 +3213,14 @@ window.switchApp = function(url) {
                     fileInput.name = 'file';
                     fileInput.value = target;
 
-                    const apiKeyInput = document.createElement('input');
-                    apiKeyInput.type = 'hidden';
-                    apiKeyInput.name = 'api_key';
-                    apiKeyInput.value = '2026';
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = this.csrf_token || '';
 
                     form.appendChild(actionInput);
                     form.appendChild(fileInput);
-                    form.appendChild(apiKeyInput);
+                    form.appendChild(csrfInput);
 
                     document.body.appendChild(form);
                     form.submit();
@@ -3562,7 +3662,7 @@ function get_qr_data() {
 }
 
 // Handle AJAX/API requests
-if (isset($_GET['ajax']) || isset($_POST['action'])) {
+if (isset($_GET['ajax']) || isset($_POST['action']) || (isset($_GET['action']) && $_GET['action'] === 'download')) {
     if (!is_api_request()) {
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json');
@@ -3580,6 +3680,99 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
         }
     }
 
+    // Direct GET download handler (for direct links with CSRF token or API key)
+    if (isset($_GET['action']) && $_GET['action'] === 'download') {
+        validate_csrf_token();
+        $file = $_GET['file'] ?? '';
+        $validation = validate_path($base_dir, $file);
+        if (!$validation['valid']) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Invalid path']);
+            exit;
+        }
+        $target = $validation['path'];
+        if (is_file($target)) {
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Description: File Transfer');
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="' . basename($target) . '"');
+            header('Expires: 0');
+            header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+            header('Pragma: public');
+            header('Content-Length: ' . filesize($target));
+            readfile($target);
+            exit;
+        }
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'File not found']);
+        exit;
+    }
+
+    // Direct path resolution endpoint: checks whether a path is a folder or file
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'resolve_path') {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+
+        $input_path = $_GET['path'] ?? '/';
+        $input_path = trim($input_path);
+
+        // Resolve ~ to home directory if present
+        if (strpos($input_path, '~') === 0) {
+            $home = getenv('HOME') ?: ($_SERVER['HOME'] ?? '');
+            if (!empty($home)) {
+                $input_path = $home . substr($input_path, 1);
+            }
+        }
+
+        $validation = validate_path($base_dir, $input_path);
+        $real = realpath($validation['path'] ?? '');
+
+        if ($real === false && !empty($validation['path'])) {
+            $real = realpath($base_dir . '/' . ltrim($input_path, '/'));
+        }
+
+        if ($real === false || !file_exists($real)) {
+            echo json_encode(['success' => false, 'error' => "Path not found: " . $input_path]);
+            exit;
+        }
+
+        $norm_base = str_replace('\\', '/', $base_dir);
+        $norm_real = str_replace('\\', '/', $real);
+
+        // Calculate relative path for frontend navigation
+        if ($norm_base !== '/' && stripos($norm_real, $norm_base) === 0) {
+            $rel_path = '/' . ltrim(substr($norm_real, strlen($norm_base)), '/');
+        } else {
+            $rel_path = $norm_real;
+        }
+        if ($rel_path === '') $rel_path = '/';
+
+        if (is_dir($real)) {
+            echo json_encode([
+                'success' => true,
+                'type' => 'directory',
+                'path' => $rel_path,
+                'name' => basename($real),
+                'realpath' => $real
+            ]);
+        } else {
+            $parent_rel = dirname($rel_path);
+            if ($parent_rel === '' || $parent_rel === '.') $parent_rel = '/';
+            $stat = @stat($real);
+            echo json_encode([
+                'success' => true,
+                'type' => 'file',
+                'path' => $rel_path,
+                'parent' => $parent_rel,
+                'name' => basename($real),
+                'size' => $stat ? $stat['size'] : 0,
+                'date' => $stat ? date('Y-m-d H:i:s', $stat['mtime']) : 'N/A',
+                'realpath' => $real
+            ]);
+        }
+        exit;
+    }
+
     if (isset($_GET['ajax']) && $_GET['ajax'] === 'files') {
         ob_start();
         header('Content-Type: application/json');
@@ -3590,6 +3783,13 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
         if ($target_dir === false || stripos($target_dir, $base_dir) !== 0) {
             $target_dir = $base_dir;
             $current_path = '/';
+        }
+
+        if (is_file($target_dir)) {
+            $parent = dirname($current_path);
+            if ($parent === '' || $parent === '.') $parent = '/';
+            echo json_encode(['success' => false, 'error' => 'Path is a file.', 'is_file' => true, 'file_path' => $current_path, 'parent' => $parent]);
+            exit;
         }
 
         $files = [];
@@ -3759,7 +3959,7 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
                 }
                 break;
             case 'download':
-                $file = $_POST['file'] ?? '';
+                $file = $_POST['file'] ?? $_GET['file'] ?? '';
 
                 $validation = validate_path($base_dir, $file);
                 if (!$validation['valid']) {
@@ -3770,8 +3970,14 @@ if (isset($_GET['ajax']) || isset($_POST['action'])) {
                 $target = $validation['path'];
 
                 if (is_file($target)) {
+                    while (ob_get_level()) ob_end_clean();
+                    header('Content-Description: File Transfer');
                     header('Content-Type: application/octet-stream');
-                    header('Content-Disposition: attachment; filename="'.basename($target).'"');
+                    header('Content-Disposition: attachment; filename="' . basename($target) . '"');
+                    header('Expires: 0');
+                    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+                    header('Pragma: public');
+                    header('Content-Length: ' . filesize($target));
                     readfile($target);
                     exit;
                 }

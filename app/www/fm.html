@@ -657,16 +657,38 @@
             <div x-cloak>
                 <div class="card" style="padding: 1rem;">
                     <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        <div class="path-breadcrumb"
-                            style="width: 100%; white-space: nowrap; overflow-x: auto; padding-bottom:0.5rem;">
-                            <span @click="navigateTo('/')">/</span>
-                            <template x-for="(segment, index) in pathSegments">
-                                <span style="display:inline-flex; align-items:center; gap:0.25rem;">
-                                    <span style="opacity:0.4;">/</span>
-                                    <span @click="navigateToSegment(index)" x-text="segment"></span>
-                                </span>
-                            </template>
-                        </div>
+                        <template x-if="!pathEditing">
+                            <div class="path-breadcrumb"
+                                style="width: 100%; white-space: nowrap; overflow-x: auto; padding-bottom:0.5rem; display: flex; align-items: center;">
+                                <span @click="navigateTo('/')">/</span>
+                                <template x-for="(segment, index) in pathSegments" :key="index">
+                                    <span style="display:inline-flex; align-items:center; gap:0.25rem;">
+                                        <span style="opacity:0.4;">/</span>
+                                        <span @click="navigateToSegment(index)" x-text="segment"></span>
+                                    </span>
+                                </template>
+                                <button type="button" @click="enablePathEdit()" class="btn btn-ghost" style="padding: 0.15rem 0.45rem; border: none; opacity: 0.6; margin-left: auto; flex-shrink: 0;" title="Edit Path / Go to file or folder">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="pathEditing">
+                            <form @submit.prevent="gotoPath()" style="display: flex; align-items: center; gap: 0.4rem; width: 100%; margin-bottom: 0.5rem;">
+                                <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" style="position: absolute; left: 10px; pointer-events: none;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    <input 
+                                        type="text" 
+                                        x-ref="pathEditInput"
+                                        x-model="pathInput" 
+                                        @keydown.escape.prevent="cancelPathEdit()"
+                                        placeholder="Enter folder or file path..." 
+                                        style="width: 100%; background: #060911; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px 6px 32px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none;"
+                                    >
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 6px; font-weight: 700;">Go</button>
+                                <button type="button" @click="cancelPathEdit()" class="btn btn-ghost" style="padding: 6px 8px; font-size: 0.85rem; border-radius: 6px;" title="Cancel">&times;</button>
+                            </form>
+                        </template>
 
                         <!-- Folder Bookmarks -->
                         <div x-show="bookmarks.length > 0"
@@ -1337,6 +1359,11 @@
         window.addEventListener('hardwareBackPress', (e) => {
             const app = document.querySelector('[x-data="ftpApp"]').__x.$data;
             if (app) {
+                if (app.pathEditing) {
+                    e.preventDefault();
+                    app.pathEditing = false;
+                    return;
+                }
                 if (app.terminalMaximized) {
                     e.preventDefault();
                     app.terminalMaximized = false;
@@ -1388,6 +1415,8 @@
                 showQRScanner: false,
                 qrScanStream: null,
                 showTerminal: false,
+                pathEditing: false,
+                pathInput: '',
                 terminalLoading: false,
                 terminalInput: '',
                 terminalMaximized: false,
@@ -1774,6 +1803,68 @@
                     this.navigateTo('/' + parts.join('/'));
                 },
 
+                enablePathEdit() {
+                    this.pathEditing = true;
+                    this.pathInput = this.currentPath || '/';
+                    this.$nextTick(() => {
+                        if (this.$refs.pathEditInput) {
+                            this.$refs.pathEditInput.focus();
+                            this.$refs.pathEditInput.select();
+                        }
+                    });
+                },
+
+                cancelPathEdit() {
+                    this.pathEditing = false;
+                    this.pathInput = '';
+                },
+
+                async gotoPath(inputPath = null) {
+                    let p = (inputPath !== null ? inputPath : this.pathInput || '').trim();
+                    if (!p) return;
+
+                    // Handle relative paths
+                    if (!p.startsWith('/') && !p.startsWith('~') && !p.match(/^[a-zA-Z]:/)) {
+                        let base = this.currentPath || '/';
+                        p = base === '/' ? '/' + p : base + '/' + p;
+                    }
+
+                    this.loading = true;
+                    try {
+                        let res = await this.apiReq({ ajax: 'resolve_path', path: p }, 'GET');
+                        if (res && res.success) {
+                            this.pathEditing = false;
+                            if (res.type === 'directory') {
+                                await this.fetchFiles(res.path);
+                                window.haptic('success');
+                            } else if (res.type === 'file') {
+                                await this.fetchFiles(res.parent);
+                                await this.inspectFileByPath(res.path, { name: res.name, size: res.size, date: res.date });
+                                window.haptic('success');
+                            }
+                        } else {
+                            // Fallback: try navigating directly via files
+                            let fetchRes = await this.apiReq({ ajax: 'files', path: p }, 'GET');
+                            if (fetchRes && fetchRes.success) {
+                                this.files = fetchRes.files;
+                                this.currentPath = fetchRes.pwd;
+                                this.pathEditing = false;
+                                window.haptic('success');
+                            } else if (fetchRes && fetchRes.is_file) {
+                                this.pathEditing = false;
+                                await this.fetchFiles(fetchRes.parent);
+                                await this.inspectFileByPath(fetchRes.file_path);
+                            } else {
+                                window.uiAlert(res?.error || fetchRes?.error || 'Path not found: ' + p);
+                            }
+                        }
+                    } catch(e) {
+                        window.uiAlert('Error resolving path: ' + (e.message || e));
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
                 formatSize(bytes) {
                     if (bytes === 0) return '0 B';
                     const k = 1024;
@@ -1951,11 +2042,15 @@
                 async inspectFile(item) {
                     // Native editor for easily viewable files
                     let target = this.currentPath === '/' ? '/' + item.name : this.currentPath + '/' + item.name;
+                    return this.inspectFileByPath(target, item);
+                },
+
+                async inspectFileByPath(target, item = null) {
                     this.loading = true;
                     let res = await this.apiReq({ action: 'read', file: target });
                     this.loading = false;
                     if (res && res.success) {
-                        this.editingFile = { ...item, fullPath: target };
+                        this.editingFile = { name: target.split('/').pop(), ...item, fullPath: target };
                         // Decode base64 to string safely
                         try {
                             this.fileContent = decodeURIComponent(atob(res.content).split('').map(function (c) {
@@ -1965,6 +2060,8 @@
                         } catch (e) {
                             window.uiAlert("File is binary or uses an unsupported encoding.");
                         }
+                    } else {
+                        window.uiAlert(res?.error || "Failed to read file.");
                     }
                 },
 
@@ -1990,9 +2087,6 @@
                     form.action = this.currentServer.url;
                     form.target = '_blank';
 
-                    // SECURITY: No longer embedding API key in form field - use header authentication instead
-                    // The download endpoint should use session or header-based auth
-
                     const action = document.createElement('input');
                     action.type = 'hidden';
                     action.name = 'action';
@@ -2005,6 +2099,14 @@
 
                     form.appendChild(action);
                     form.appendChild(fileInput);
+
+                    if (this.currentServer && this.currentServer.apiKey) {
+                        const keyInput = document.createElement('input');
+                        keyInput.type = 'hidden';
+                        keyInput.name = 'api_key';
+                        keyInput.value = this.currentServer.apiKey;
+                        form.appendChild(keyInput);
+                    }
 
                     document.body.appendChild(form);
                     form.submit();
