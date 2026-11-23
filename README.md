@@ -4,7 +4,7 @@ A **lightweight, single-file suite** of server management tools designed for mod
 
 <div align="center">
 
-![ServerLuxe Badge](https://img.shields.io/badge/version-1.3.1-cyan?style=flat-square)
+![ServerLuxe Badge](https://img.shields.io/badge/version-1.5.3-cyan?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen?style=flat-square)
 
@@ -17,13 +17,17 @@ A **lightweight, single-file suite** of server management tools designed for mod
 ## Features
 
 - **Zero Dependencies** - Single PHP files, no complex framework dependencies. Just drop and run.
-- **Beautiful UI/UX** - Glassmorphism design, dark mode optimized, smooth animations, mobile-first responsive layout
-- **RESTful API** - Native API endpoints for headless management, custom integrations, and mobile app connections
-- **Model Context Protocol (MCP)** - Securely connect AI agents (like Claude Desktop and Cursor) directly to your server databases and files
-- **Secure by Default** - Password hashing (bcrypt), API key authentication, CSRF protection, session management, path traversal prevention
-- **Cross-Platform Ready** - Works on desktop browsers AND native Android/iOS apps via Capacitor
-- **Real-time Operations** - Fast file browsing, instant database queries, live status monitoring
-- **Mobile Optimization** - Full-featured native Android app with multi-node support, encrypted credentials storage
+- **Native Web Terminal** - Integrated multi-tab shell console (`bash`/`sh`) with ANSI colors, command history, and toggleable security controls on web & API.
+- **Grid & List Views with Live Thumbnails** - Switch seamlessly between List View and Grid View, with real image thumbnails streamed directly from your server.
+- **Universal File Preview (Quick Look)** - View images, stream videos, listen to audio files, read PDFs, or inspect formatted code with an instant "Edit File" button.
+- **Instant Search & Path Jump** - Live header search filters files as you type, and direct address editing (`Ctrl+G` / `Cmd+G`) jumps to any directory or file.
+- **Beautiful UI/UX** - Glassmorphism design, dark mode optimized, smooth animations, mobile-first responsive layout with icon-only controls.
+- **Model Context Protocol (MCP)** - Securely connect AI agents (like Claude Desktop and Cursor) directly to your server databases and files via `mcp-bridge.js`.
+- **Auto-Update Engine** - One-click updates checking directly against GitHub releases or raw branches to stay perpetually current with zero downtime.
+- **RESTful API** - Native API endpoints for headless management, custom integrations, and mobile app connections.
+- **Secure by Default** - Password hashing (bcrypt), API key authentication, CSRF protection, session management, path traversal prevention.
+- **Cross-Platform Ready** - Works on desktop browsers AND native Android/iOS apps via Capacitor.
+- **Mobile Optimization** - Full-featured native Android app with multi-node support and encrypted credentials storage.
 
 ---
 
@@ -117,14 +121,19 @@ curl -X POST https://example.com/admin/db.php \
 A sleek, fast file system manager in a single PHP file.
 
 #### Features:
-- 📁 **File Browsing** - Navigate your entire filesystem with a beautiful UI
-- ✏️ **Code Editor** - Inline editor for quick remote debugging (syntax highlighting)
+- 📁 **File Browsing** - Navigate your entire filesystem with a beautiful, fast UI
+- 💻 **Native Web Terminal** - Full interactive terminal with tabs, command history, and ANSI colors (toggleable on web & API)
+- 🖼️ **Grid View & Thumbnails** - Switch between List and Grid view; stream real image thumbnails for JPG, PNG, GIF, WebP, SVG, and AVIF
+- 👁️ **Universal File Preview** - Quick Look for images, HTML5 video/audio players, PDF viewer, and formatted code viewer
+- 🔍 **Live Search Filter** - Real-time filtering by file or directory name on the header
+- 📍 **Direct Path Address Bar** - Click the path or press `Ctrl+G` / `Cmd+G` to jump straight to any file or folder
+- ✏️ **Code Editor** - Inline editor for quick remote editing with safe UTF-8 decoding
 - 📝 **File Operations** - Create, rename, delete, move files and folders
 - 🔒 **Permissions** - Modify file permissions (CHMOD) directly from the UI
-- 📦 **Compression** - Bulk ZIP archive creation for easy backups
+- 📦 **Compression** - Bulk ZIP archive creation and extraction for easy backups
 - 📤 **Upload** - Drag-and-drop file upload with validation
 - 🌐 **Remote Fetch** - Download files from external URLs directly to your server
-- 🛡️ **Security** - Path traversal prevention, file type validation, rate limiting
+- 🛡️ **Security** - Path traversal prevention, CSRF protection, file type validation, rate limiting
 
 #### Quick Example:
 ```bash
@@ -436,15 +445,23 @@ Found a security vulnerability? Please report privately to: [security@bycomsolut
 ### ✅ Completed
 - ✅ Single-file database manager (db.php)
 - ✅ Single-file file manager (fm.php)
-- ✅ Beautiful glassmorphism UI with dark mode
+- ✅ Single-file installer & updater (index.php)
+- ✅ Native multi-tab Web Terminal (bash/sh shell with ANSI colors & execution control)
+- ✅ Grid view with real image thumbnails (JPG, PNG, WebP, SVG, AVIF)
+- ✅ Universal file preview modal (video, audio, PDF, images, code)
+- ✅ Real-time filename search filter on table/file headers
+- ✅ Direct address/path navigation (`Ctrl+G` / `Cmd+G`)
+- ✅ Model Context Protocol (MCP) bridge for AI agents (`mcp-bridge.js`)
+- ✅ Beautiful glassmorphism UI with dark mode & icon-only navigation
 - ✅ RESTful API with key authentication
-- ✅ Native Android app (Capacitor)
-- ✅ Comprehensive security hardening
+- ✅ Native Android app (Capacitor) with biometrics & encrypted credentials
+- ✅ Comprehensive security hardening (CSRF, timing attack protection, rate limits)
 - ✅ Session management and timeouts
 - ✅ Multi-node support in mobile app
-- ✅ File upload with validation
-- ✅ SQL console with history
+- ✅ File upload with validation & remote URL fetch
+- ✅ SQL console with history & snippet manager
 - ✅ Code editor with syntax highlighting
+- ✅ One-click GitHub auto-update engine
 
 ### 🚀 Planned (Roadmap)
 - 📅 iOS app on App Store
@@ -484,21 +501,26 @@ Found a security vulnerability? Please report privately to: [security@bycomsolut
 ## 📁 Project Structure
 
 ```
-mysqlweb/
-├── server/                 # Server-side PHP files
-│   ├── db.php             # SQLuxe - Database Manager
-│   ├── fm.php             # FileLuxe - File Manager
-│   └── .env               # Configuration file
-├── app/                    # Mobile app (Capacitor)
-│   ├── www/               # Web assets
-│   │   ├── index.html     # Database Manager UI
-│   │   ├── fm.html        # File Manager UI
-│   │   ├── ui.js          # Shared UI components
-│   │   └── styles/        # CSS styling
-│   ├── android/           # Android native code
-│   ├── package.json       # Node dependencies
+ServerLuxe/
+├── server/                     # Server-side standalone PHP suite
+│   ├── index.php              # ServerLuxe Setup & Dashboard
+│   ├── db.php                 # SQLuxe - Database Manager
+│   ├── fm.php                 # FileLuxe - File Manager & Terminal
+│   ├── mcp-bridge.js          # Model Context Protocol stdio-to-HTTP bridge
+│   ├── mcp_docs.md            # MCP Integration Guide
+│   ├── ServerLuxe-1.5.3.zip   # Packaged distribution archive
+│   └── .env.example           # Configuration template
+├── app/                        # Mobile app (Capacitor)
+│   ├── www/                   # Web assets
+│   │   ├── index.html         # Database Manager UI
+│   │   ├── fm.html            # File Manager & Terminal UI
+│   │   ├── ui.js              # Shared UI components
+│   │   └── styles/            # CSS styling
+│   ├── android/               # Android native project & assets
+│   ├── package.json           # Node dependencies
 │   └── capacitor.config.json
-└── README.md              # This file
+├── CHANGELOG.md               # Version release logs
+└── README.md                  # Documentation
 ```
 
 ---
