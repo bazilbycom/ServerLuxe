@@ -4,6 +4,24 @@ All notable changes to the **ServerLuxe** project will be documented in this fil
 
 ---
 
+## [1.5.1] - 2026-11-23
+### Added
+- **Native Terminal App Appearance & Operations**:
+  - Transformed Web & Mobile Terminal into an authentic native terminal emulator (matching macOS Terminal, iTerm2, and Alacritty aesthetics).
+  - **macOS Window Chrome**: Added authentic window title bar with color-coded window traffic lights (close, minimize/clear, full-screen/maximize toggle), active process title displaying `user@host:path`, and live online/offline status badge.
+  - **Multi-Tab Sessions**: Full multi-tab management with `+ New Tab`, per-tab working directories, independent histories, and tab-close controls mimicking modern terminal apps.
+  - **ANSI 16-Color & Style Parser**: Converts standard ANSI escape sequences into styled HTML spans so colored CLI tools (such as `ls --color`, `git status`, `composer`, `diff`) render authentic syntax colors.
+  - **Interactive Inline Prompt**: Integrated active prompt line (`user@hostname:path$ `) directly at the bottom of the scrollback buffer with blinking block cursor (`JetBrains Mono`).
+  - **Native Keyboard Shortcuts**:
+    - `Ctrl+C` / `Cmd+C`: Interrupt active input line, echoes `^C` to buffer without breaking session.
+    - `Ctrl+L` / `Cmd+L`: Instant clear screen.
+    - `Tab`: Filename & directory auto-completion based on current directory contents.
+    - `Up` / `Down` arrows: Traverse command history.
+  - **Dynamic Shell CWD Tracking**: Wraps commands on Unix environments to automatically track directory transitions (`cd`) and synchronize the active working directory across subsequent commands.
+  - **System Identity Detection**: Dynamically retrieves and displays current system user (`posix_getpwuid` / `whoami`) and machine hostname.
+
+---
+
 ## [1.5.0] - 2026-11-23
 ### Added
 - **Web & API Terminal Access**:

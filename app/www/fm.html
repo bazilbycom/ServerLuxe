@@ -10,8 +10,56 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="ui.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+        // Native Terminal ANSI & Color Parser
+        window.renderAnsiTerminal = function(text) {
+            if (!text) return '';
+            let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            s = s.replace(/\x1b\[[0-9;]*[HfABCDsuJKnhilmpqr]/g, '');
+            const colorMap = {
+                '0': '</span>',
+                '1': '<span style="font-weight:bold;">',
+                '2': '<span style="opacity:0.75;">',
+                '3': '<span style="font-style:italic;">',
+                '4': '<span style="text-decoration:underline;">',
+                '30': '<span style="color:#475569;">',
+                '31': '<span style="color:#f87171;">',
+                '32': '<span style="color:#4ade80;">',
+                '33': '<span style="color:#fbbf24;">',
+                '34': '<span style="color:#60a5fa;">',
+                '35': '<span style="color:#c084fc;">',
+                '36': '<span style="color:#22d3ee;">',
+                '37': '<span style="color:#e2e8f0;">',
+                '90': '<span style="color:#64748b;">',
+                '91': '<span style="color:#ef4444;">',
+                '92': '<span style="color:#22c55e;">',
+                '93': '<span style="color:#f59e0b;">',
+                '94': '<span style="color:#3b82f6;">',
+                '95': '<span style="color:#a855f7;">',
+                '96': '<span style="color:#06b6d4;">',
+                '97': '<span style="color:#ffffff;">',
+                '40': '<span style="background-color:#1e293b;">',
+                '41': '<span style="background-color:#7f1d1d;">',
+                '42': '<span style="background-color:#14532d;">',
+                '43': '<span style="background-color:#78350f;">',
+                '44': '<span style="background-color:#1e3a8a;">',
+                '45': '<span style="background-color:#581c87;">',
+                '46': '<span style="background-color:#164e63;">',
+                '47': '<span style="background-color:#334155;">'
+            };
+            s = s.replace(/\x1b\[([0-9;]+)m/g, function(match, codes) {
+                const parts = codes.split(';');
+                let out = '';
+                for (let p of parts) {
+                    if (colorMap[p]) out += colorMap[p];
+                }
+                return out;
+            });
+            return s;
+        };
+    </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-deep: #0f172a;
@@ -295,6 +343,189 @@
 
         .path-breadcrumb span {
             cursor: pointer;
+        }
+
+        /* Native Terminal Window Styling */
+        .native-terminal-card {
+            background: #090d16 !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .native-terminal-card.is-maximized {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 10001 !important;
+        }
+        .term-titlebar {
+            background: linear-gradient(180deg, #1e2638 0%, #151b28 100%);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+            height: 38px;
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .term-lights {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .term-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid rgba(0, 0, 0, 0.3);
+            transition: all 0.15s ease;
+            color: rgba(0, 0, 0, 0.7);
+            font-size: 8px;
+            font-weight: 900;
+            line-height: 1;
+            padding: 0;
+        }
+        .term-light-close { background: #ff5f56; }
+        .term-light-close:hover { background: #e0443e; }
+        .term-light-min { background: #ffbd2e; }
+        .term-light-min:hover { background: #dea123; }
+        .term-light-max { background: #27c93f; }
+        .term-light-max:hover { background: #1aab29; }
+        .term-title {
+            color: #94a3b8;
+            font-size: 0.76rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+        }
+        .term-tabs-bar {
+            background: #0f1420;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            height: 32px;
+            min-height: 32px;
+            overflow-x: auto;
+        }
+        .term-tab-pill {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px 6px 0 0;
+            color: #94a3b8;
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            border-bottom: none;
+            font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+        }
+        .term-tab-pill.active {
+            background: #060911;
+            color: #22d3ee;
+            border-color: rgba(34, 211, 238, 0.3);
+            font-weight: 600;
+        }
+        .term-screen {
+            background: #060911;
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 18px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #e2e8f0;
+            cursor: text;
+        }
+        .term-prompt-line {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+        .term-user { color: #34d399; font-weight: 700; }
+        .term-at { color: #64748b; }
+        .term-host { color: #38bdf8; font-weight: 700; }
+        .term-colon { color: #64748b; margin-right: 4px; }
+        .term-path { color: #a78bfa; font-weight: 700; margin-right: 6px; }
+        .term-symbol { color: #f59e0b; font-weight: 800; margin-right: 8px; }
+        .term-active-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #f8fafc;
+            font-family: inherit;
+            font-size: 13px;
+            flex: 1;
+            padding: 0;
+            margin: 0;
+            caret-color: #22d3ee;
+        }
+        .term-cursor-block {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: #22d3ee;
+            vertical-align: text-bottom;
+            animation: termBlink 1s step-end infinite;
+        }
+        @keyframes termBlink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+        .term-badge-online {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .term-badge-offline {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+        .term-quick-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            padding: 2px 7px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .term-quick-btn:hover {
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+            border-color: rgba(34, 211, 238, 0.3);
         }
     </style>
 </head>
@@ -940,79 +1171,158 @@
         </div>
     </div>
 
-    <!-- Web Terminal Modal -->
-    <div class="modal-overlay" x-show="showTerminal" x-cloak x-transition>
-        <div class="modal-card modal-panel" style="width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column;" @click.outside="showTerminal = false">
-            <div class="modal-header" style="background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid var(--border);">
-                <div class="flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                    <h3 style="font-weight: 700; font-size: 1rem; color: #fff;">ServerLuxe Terminal</h3>
+    <!-- Web Terminal Modal (Native Terminal Experience) -->
+    <div class="modal-overlay" x-show="showTerminal" x-cloak x-transition @click.self="showTerminal = false">
+        <div 
+            class="modal-card native-terminal-card" 
+            :class="terminalMaximized ? 'is-maximized' : ''" 
+            :style="terminalMaximized ? '' : 'width: 95%; max-width: 960px; height: 82vh; min-height: 480px;'"
+            @click="focusTerminal()"
+        >
+            <!-- macOS-style Terminal Title Bar -->
+            <div class="term-titlebar">
+                <div class="term-lights">
+                    <button type="button" @click="showTerminal = false" class="term-light term-light-close" title="Close Terminal (Esc)">&times;</button>
+                    <button type="button" @click="clearTerminal()" class="term-light term-light-min" title="Clear Screen (Ctrl+L)">&minus;</button>
+                    <button type="button" @click="toggleMaximizeTerminal()" class="term-light term-light-max" title="Toggle Fullscreen">&plus;</button>
                 </div>
+                
+                <div class="term-title">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <span><span x-text="terminalUser"></span>@<span x-text="terminalHost"></span>: <span style="color:#e2e8f0;" x-text="terminalTabs[terminalActiveTab]?.cwd || terminalCwd || '~'"></span></span>
+                </div>
+
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="clearTerminal()" class="btn btn-ghost" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Clear Output">Clear</button>
-                    <button type="button" @click="showTerminal = false" class="btn btn-ghost" style="padding: 0.25rem 0.5rem; border: none; font-size: 1.25rem; line-height: 1;">&times;</button>
+                    <span :class="terminalEnabled ? 'term-badge-online' : 'term-badge-offline'" x-text="terminalEnabled ? 'READY' : 'OFFLINE'"></span>
+                    <button type="button" @click.stop="toggleTerminal()" class="term-quick-btn" style="font-size: 0.65rem;" :style="terminalEnabled ? 'color: #f87171;' : 'color: #22d3ee;'" x-text="terminalEnabled ? 'Disable' : 'Enable'"></button>
                 </div>
             </div>
 
-            <!-- Quick Commands Bar -->
-            <div style="background: rgba(10, 15, 30, 0.8); border-bottom: 1px solid var(--border); padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; flex-shrink: 0;">
-                <span style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem;">Quick:</span>
-                <button type="button" @click="runQuickCmd('pwd')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">pwd</button>
-                <button type="button" @click="runQuickCmd('ls -la')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">ls -la</button>
-                <button type="button" @click="runQuickCmd('whoami')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">whoami</button>
-                <button type="button" @click="runQuickCmd('git status')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">git status</button>
-                <button type="button" @click="runQuickCmd('uptime')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">uptime</button>
-                <button type="button" @click="runQuickCmd('php -v')" class="btn btn-ghost" style="padding: 0.15rem 0.5rem; font-size: 0.7rem; font-family: monospace;">php -v</button>
+            <!-- Terminal Tabs Bar -->
+            <div class="term-tabs-bar">
+                <template x-for="(tab, idx) in terminalTabs" :key="tab.id">
+                    <div 
+                        class="term-tab-pill" 
+                        :class="terminalActiveTab === idx ? 'active' : ''"
+                        @click.stop="switchTerminalTab(idx)"
+                    >
+                        <span style="opacity:0.6;">&gt;_</span>
+                        <span x-text="tab.name"></span>
+                        <span 
+                            x-show="terminalTabs.length > 1" 
+                            @click.stop="closeTerminalTab(idx, $event)" 
+                            style="opacity: 0.5; font-size: 11px; margin-left: 2px;"
+                            onmouseover="this.style.opacity='1'" 
+                            onmouseout="this.style.opacity='0.5'"
+                        >&times;</span>
+                    </div>
+                </template>
+                <button type="button" @click.stop="addTerminalTab()" class="term-quick-btn" title="New Terminal Tab" style="padding: 2px 8px; font-weight: bold;">+ New Tab</button>
             </div>
 
-            <!-- Terminal Output Stream -->
-            <div x-ref="terminalBody" style="flex: 1; overflow-y: auto; background: #050811; padding: 1rem; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1; user-select: text;">
-                <template x-for="(log, idx) in terminalLogs" :key="idx">
-                    <div style="margin-bottom: 0.35rem; white-space: pre-wrap; word-break: break-all;">
+            <!-- Terminal Warning Banner if disabled -->
+            <div x-show="!terminalEnabled" style="background: rgba(239, 68, 68, 0.15); border-bottom: 1px solid rgba(239, 68, 68, 0.3); padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: #fca5a5;">
+                <div class="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Terminal is currently disabled. Click <strong>Enable</strong> to allow shell command execution.</span>
+                </div>
+                <button type="button" @click.stop="toggleTerminal(true)" class="btn btn-primary" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; background: var(--danger); border-color: var(--danger); color: #fff;">Enable Now</button>
+            </div>
+
+            <!-- Native Terminal Body & Screen -->
+            <div 
+                x-ref="terminalBody" 
+                class="term-screen"
+                @click="focusTerminal()"
+            >
+                <template x-for="(log, idx) in (terminalTabs[terminalActiveTab]?.logs || [])" :key="idx">
+                    <div style="margin-bottom: 3px; word-break: break-all;">
+                        <!-- System banner -->
+                        <template x-if="log.type === 'system-banner'">
+                            <div style="color: #64748b; font-size: 12px; margin-bottom: 8px; border-left: 2px solid #22d3ee; padding-left: 8px;" x-text="log.text"></div>
+                        </template>
+
+                        <!-- Command executed line -->
                         <template x-if="log.type === 'cmd'">
-                            <div style="color: var(--accent); font-weight: 700;">
-                                <span style="color: var(--text-secondary); opacity: 0.6; font-size: 0.7rem;" x-text="log.cwd ? log.cwd + ' ' : ''"></span>
-                                <span x-text="log.text"></span>
+                            <div class="term-prompt-line" style="margin-bottom: 2px;">
+                                <span class="term-user" x-text="log.user || terminalUser"></span>
+                                <span class="term-at">@</span>
+                                <span class="term-host" x-text="log.hostname || terminalHost"></span>
+                                <span class="term-colon">:</span>
+                                <span class="term-path" x-text="log.cwd ? (log.cwd.split('/').pop() || '/') : '~'"></span>
+                                <span class="term-symbol">$</span>
+                                <span style="color: #f8fafc; font-weight: 600;" x-text="log.text"></span>
                             </div>
                         </template>
+
+                        <!-- Standard Output (with ANSI colors) -->
                         <template x-if="log.type === 'stdout'">
-                            <div style="color: #f1f5f9;" x-text="log.text"></div>
+                            <div style="color: #e2e8f0; white-space: pre-wrap;" x-html="window.renderAnsiTerminal(log.text)"></div>
                         </template>
+
+                        <!-- Standard Error -->
                         <template x-if="log.type === 'stderr'">
-                            <div style="color: #f87171;" x-text="log.text"></div>
+                            <div style="color: #f87171; white-space: pre-wrap;" x-html="window.renderAnsiTerminal(log.text)"></div>
                         </template>
+
+                        <!-- General error / timeout -->
                         <template x-if="log.type === 'error'">
                             <div style="color: #ef4444; font-weight: 600;" x-text="log.text"></div>
                         </template>
-                        <template x-if="log.type === 'info'">
-                            <div style="color: #94a3b8; font-style: italic; font-size: 0.75rem;" x-text="log.text"></div>
+
+                        <!-- Exit code badge for non-zero codes -->
+                        <template x-if="log.type === 'exit-info'">
+                            <div style="color: #f59e0b; font-size: 11px; margin-top: 1px; opacity: 0.85;">
+                                [Process exited with code <span x-text="log.exitCode"></span>]
+                            </div>
                         </template>
                     </div>
                 </template>
-                <div x-show="terminalLoading" class="flex items-center gap-2" style="color: var(--accent); margin-top: 0.5rem;">
-                    <div class="spinner animate-spin" style="width: 14px; height: 14px; border: 2px solid rgba(34, 211, 238, 0.2); border-top-color: var(--accent); border-radius: 50%;"></div>
-                    <span style="font-size: 0.75rem;">Executing command...</span>
+
+                <!-- Active In-Progress Prompt Line (Native Terminal Look) -->
+                <div class="term-prompt-line">
+                    <span class="term-user" x-text="terminalUser"></span>
+                    <span class="term-at">@</span>
+                    <span class="term-host" x-text="terminalHost"></span>
+                    <span class="term-colon">:</span>
+                    <span class="term-path" x-text="terminalTabs[terminalActiveTab]?.cwd ? (terminalTabs[terminalActiveTab].cwd.split('/').pop() || '/') : (terminalCwd ? (terminalCwd.split('/').pop() || '/') : '~')"></span>
+                    <span class="term-symbol">$</span>
+                    <input 
+                        type="text" 
+                        x-ref="terminalCmdInput"
+                        x-model="terminalInput" 
+                        @keydown.enter.prevent="runTerminalCommand"
+                        @keydown.up.prevent="navigateHistory('up')"
+                        @keydown.down.prevent="navigateHistory('down')"
+                        @keydown="handleTerminalKey($event)"
+                        :disabled="terminalLoading"
+                        class="term-active-input"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        autocomplete="off"
+                    >
+                    <span x-show="terminalLoading" class="spinner animate-spin" style="width: 12px; height: 12px; border: 2px solid rgba(34, 211, 238, 0.2); border-top-color: #22d3ee; border-radius: 50%; margin-left: 6px;"></span>
                 </div>
             </div>
 
-            <!-- Terminal Prompt Bar -->
-            <div style="background: rgba(15, 23, 42, 0.98); border-top: 1px solid var(--border); padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
-                <span style="font-family: monospace; font-size: 0.85rem; color: var(--accent); font-weight: 800; flex-shrink: 0;" x-text="terminalCwd ? terminalCwd.split('/').pop() || '/' : '/'">&gt;</span>
-                <span style="color: var(--text-secondary); font-family: monospace; font-size: 0.85rem;">$</span>
-                <input 
-                    type="text" 
-                    x-ref="terminalCmdInput"
-                    x-model="terminalInput" 
-                    @keydown.enter.prevent="runTerminalCommand"
-                    @keydown.up.prevent="navigateHistory('up')"
-                    @keydown.down.prevent="navigateHistory('down')"
-                    :disabled="terminalLoading"
-                    placeholder="Enter shell command (e.g. ls -la, git status, cd <folder>)..." 
-                    style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 0.85rem; padding: 0.25rem 0.5rem;"
-                >
-                <button type="button" @click="runTerminalCommand" class="btn btn-primary" :disabled="terminalLoading || !terminalInput.trim()" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;">
-                    Run
-                </button>
+            <!-- Terminal Footer Status Bar & Quick Actions -->
+            <div style="background: #0f1420; border-top: 1px solid rgba(255, 255, 255, 0.06); padding: 5px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, monospace;">
+                <div class="flex items-center gap-1" style="overflow-x: auto;">
+                    <span style="opacity: 0.6; margin-right: 4px;">Quick:</span>
+                    <button type="button" @click.stop="runQuickCmd('pwd')" class="term-quick-btn">pwd</button>
+                    <button type="button" @click.stop="runQuickCmd('ls -la')" class="term-quick-btn">ls -la</button>
+                    <button type="button" @click.stop="runQuickCmd('whoami')" class="term-quick-btn">whoami</button>
+                    <button type="button" @click.stop="runQuickCmd('git status')" class="term-quick-btn">git status</button>
+                    <button type="button" @click.stop="runQuickCmd('uptime')" class="term-quick-btn">uptime</button>
+                    <button type="button" @click.stop="runQuickCmd('df -h')" class="term-quick-btn">df -h</button>
+                    <button type="button" @click.stop="runQuickCmd('php -v')" class="term-quick-btn">php -v</button>
+                </div>
+                <div class="flex items-center gap-3 mobile-hide" style="flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;">
+                    <span>UTF-8</span>
+                    <span>bash</span>
+                    <span x-text="(terminalTabs[terminalActiveTab]?.cwd || terminalCwd || '/')"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -1027,6 +1337,11 @@
         window.addEventListener('hardwareBackPress', (e) => {
             const app = document.querySelector('[x-data="ftpApp"]').__x.$data;
             if (app) {
+                if (app.terminalMaximized) {
+                    e.preventDefault();
+                    app.terminalMaximized = false;
+                    return;
+                }
                 if (app.showAddServer || app.openServerManager || app.showMkdir || app.showNewFile || app.activeItem || app.showEditor || app.showQRScanner || app.showTerminal) {
                     e.preventDefault();
                     app.showAddServer = false;
@@ -1075,9 +1390,13 @@
                 showTerminal: false,
                 terminalLoading: false,
                 terminalInput: '',
-                terminalLogs: [],
-                terminalHistory: [],
-                terminalHistoryIdx: -1,
+                terminalMaximized: false,
+                terminalUser: 'user',
+                terminalHost: 'server',
+                terminalActiveTab: 0,
+                terminalTabs: [
+                    { id: 1, name: 'bash', cwd: '', history: [], historyIdx: -1, logs: [] }
+                ],
                 terminalCwd: '',
                 terminalEnabled: true,
 
@@ -1693,7 +2012,7 @@
                 },
 
                 // Terminal Methods
-                openTerminal() {
+                async openTerminal() {
                     if (!this.currentServer) {
                         return window.uiAlert("Please connect to a server first.");
                     }
@@ -1701,16 +2020,92 @@
                     if (!this.terminalCwd) {
                         this.terminalCwd = this.currentPath || '/';
                     }
-                    if (this.terminalLogs.length === 0) {
-                        this.terminalLogs.push({
-                            type: 'info',
-                            text: 'Connected to ' + (this.currentServer.name || 'Server') + ' Terminal.\nWorking directory: ' + (this.terminalCwd || '/')
+                    if (this.terminalTabs.length === 0) {
+                        this.terminalTabs = [{ id: Date.now(), name: 'bash', cwd: this.terminalCwd, history: [], historyIdx: -1, logs: [] }];
+                        this.terminalActiveTab = 0;
+                    }
+                    const activeTab = this.terminalTabs[this.terminalActiveTab] || this.terminalTabs[0];
+                    if (activeTab && activeTab.logs.length === 0) {
+                        activeTab.logs.push({
+                            type: 'system-banner',
+                            text: 'Connected to ' + (this.currentServer.name || 'Server') + ' Terminal (' + (navigator.platform || 'App') + ')\nType commands or press Tab for auto-completion.'
                         });
                     }
+                    if (this.currentServer.name) {
+                        this.terminalHost = this.currentServer.name.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                    }
+                    // Fetch latest terminal status and system info from server
+                    try {
+                        const data = await this.apiReq({ action: 'get_mcp_config' }, 'GET');
+                        if (data) {
+                            this.terminalEnabled = !!data.terminal_enabled;
+                            if (data.terminal_info) {
+                                if (data.terminal_info.user) this.terminalUser = data.terminal_info.user;
+                                if (data.terminal_info.hostname) this.terminalHost = data.terminal_info.hostname;
+                            }
+                        }
+                    } catch(e) {}
                     this.$nextTick(() => {
-                        if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
+                        this.focusTerminal();
                         this.scrollTerminal();
                     });
+                },
+
+                focusTerminal() {
+                    this.$nextTick(() => {
+                        if (this.$refs.terminalCmdInput) {
+                            this.$refs.terminalCmdInput.focus();
+                        }
+                    });
+                },
+
+                toggleMaximizeTerminal() {
+                    this.terminalMaximized = !this.terminalMaximized;
+                    this.focusTerminal();
+                    this.scrollTerminal();
+                },
+
+                addTerminalTab() {
+                    const id = Date.now();
+                    const newTab = {
+                        id: id,
+                        name: 'bash ' + (this.terminalTabs.length + 1),
+                        cwd: this.terminalCwd || this.currentPath || '/',
+                        history: [],
+                        historyIdx: -1,
+                        logs: [{
+                            type: 'system-banner',
+                            text: 'Session ' + (this.terminalTabs.length + 1) + ' ready. Working directory: ' + (this.terminalCwd || '/')
+                        }]
+                    };
+                    this.terminalTabs.push(newTab);
+                    this.terminalActiveTab = this.terminalTabs.length - 1;
+                    this.focusTerminal();
+                    this.scrollTerminal();
+                },
+
+                closeTerminalTab(idx, event = null) {
+                    if (event) event.stopPropagation();
+                    if (this.terminalTabs.length <= 1) {
+                        this.showTerminal = false;
+                        return;
+                    }
+                    this.terminalTabs.splice(idx, 1);
+                    if (this.terminalActiveTab >= this.terminalTabs.length) {
+                        this.terminalActiveTab = this.terminalTabs.length - 1;
+                    }
+                    this.focusTerminal();
+                    this.scrollTerminal();
+                },
+
+                switchTerminalTab(idx) {
+                    this.terminalActiveTab = idx;
+                    const tab = this.terminalTabs[idx];
+                    if (tab && tab.cwd) {
+                        this.terminalCwd = tab.cwd;
+                    }
+                    this.focusTerminal();
+                    this.scrollTerminal();
                 },
 
                 scrollTerminal() {
@@ -1722,27 +2117,110 @@
                 },
 
                 clearTerminal() {
-                    this.terminalLogs = [];
+                    const tab = this.terminalTabs[this.terminalActiveTab];
+                    if (tab) {
+                        tab.logs = [];
+                    }
+                },
+
+                async toggleTerminal(enableState = null) {
+                    const target = enableState !== null ? enableState : !this.terminalEnabled;
+                    this.loading = true;
+                    try {
+                        const res = await this.apiReq({
+                            action: 'toggle_terminal',
+                            enabled: target ? '1' : '0'
+                        });
+                        if (res && res.success) {
+                            this.terminalEnabled = !!res.terminal_enabled;
+                            window.haptic('success');
+                            window.uiAlert(this.terminalEnabled ? 'Terminal access enabled.' : 'Terminal access disabled.');
+                        } else {
+                            window.uiAlert('Failed to toggle terminal: ' + (res?.error || 'Unknown error'));
+                        }
+                    } catch(e) {
+                        window.uiAlert('Network error while toggling terminal.');
+                    } finally {
+                        this.loading = false;
+                    }
                 },
 
                 navigateHistory(dir) {
-                    if (this.terminalHistory.length === 0) return;
+                    const tab = this.terminalTabs[this.terminalActiveTab];
+                    if (!tab || tab.history.length === 0) return;
                     if (dir === 'up') {
-                        if (this.terminalHistoryIdx < this.terminalHistory.length - 1) {
-                            this.terminalHistoryIdx++;
+                        if (tab.historyIdx < tab.history.length - 1) {
+                            tab.historyIdx++;
                         }
                     } else if (dir === 'down') {
-                        if (this.terminalHistoryIdx > 0) {
-                            this.terminalHistoryIdx--;
+                        if (tab.historyIdx > 0) {
+                            tab.historyIdx--;
                         } else {
-                            this.terminalHistoryIdx = -1;
+                            tab.historyIdx = -1;
                             this.terminalInput = '';
                             return;
                         }
                     }
-                    if (this.terminalHistoryIdx >= 0) {
-                        const rev = [...this.terminalHistory].reverse();
-                        this.terminalInput = rev[this.terminalHistoryIdx] || '';
+                    if (tab.historyIdx >= 0) {
+                        const rev = [...tab.history].reverse();
+                        this.terminalInput = rev[tab.historyIdx] || '';
+                    }
+                },
+
+                handleTerminalKey(e) {
+                    // Ctrl+C / Cmd+C handling: clear active line or copy selection
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+                        const sel = window.getSelection().toString();
+                        if (!sel) {
+                            const tab = this.terminalTabs[this.terminalActiveTab];
+                            if (tab) {
+                                tab.logs.push({
+                                    type: 'cmd',
+                                    cwd: tab.cwd || this.terminalCwd,
+                                    text: (this.terminalInput || '') + '^C',
+                                    user: this.terminalUser,
+                                    hostname: this.terminalHost
+                                });
+                            }
+                            this.terminalInput = '';
+                            this.scrollTerminal();
+                        }
+                        return;
+                    }
+
+                    // Ctrl+L: clear screen like native terminal
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L')) {
+                        e.preventDefault();
+                        this.clearTerminal();
+                        return;
+                    }
+
+                    // Tab key: auto-complete filenames in cwd
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.autoCompleteTerminal();
+                    }
+                },
+
+                autoCompleteTerminal() {
+                    const input = this.terminalInput || '';
+                    const parts = input.split(' ');
+                    const lastToken = parts[parts.length - 1] || '';
+                    if (!lastToken) return;
+
+                    const candidates = (this.files || []).map(f => f.name).filter(n => n.startsWith(lastToken));
+                    if (candidates.length === 1) {
+                        parts[parts.length - 1] = candidates[0];
+                        this.terminalInput = parts.join(' ');
+                    } else if (candidates.length > 1) {
+                        const tab = this.terminalTabs[this.terminalActiveTab];
+                        if (tab) {
+                            tab.logs.push({
+                                type: 'stdout',
+                                text: candidates.join('   ')
+                            });
+                            this.scrollTerminal();
+                        }
                     }
                 },
 
@@ -1755,22 +2233,36 @@
                     const cmd = (this.terminalInput || '').trim();
                     if (!cmd || this.terminalLoading) return;
 
-                    this.terminalHistory.push(cmd);
-                    if (this.terminalHistory.length > 50) this.terminalHistory.shift();
-                    this.terminalHistoryIdx = -1;
+                    const tab = this.terminalTabs[this.terminalActiveTab] || { history: [], logs: [], cwd: this.terminalCwd };
 
-                    this.terminalLogs.push({
+                    // Add to command history
+                    tab.history.push(cmd);
+                    if (tab.history.length > 100) tab.history.shift();
+                    tab.historyIdx = -1;
+
+                    // Echo command to log with rich metadata
+                    const cmdCwd = tab.cwd || this.terminalCwd || this.currentPath || '/';
+                    tab.logs.push({
                         type: 'cmd',
-                        cwd: this.terminalCwd,
-                        text: '$ ' + cmd
+                        cwd: cmdCwd,
+                        text: cmd,
+                        user: this.terminalUser,
+                        hostname: this.terminalHost
                     });
                     this.terminalInput = '';
                     this.terminalLoading = true;
                     this.scrollTerminal();
 
                     if (cmd === 'clear' || cmd === 'cls') {
-                        this.terminalLogs = [];
+                        tab.logs = [];
                         this.terminalLoading = false;
+                        this.focusTerminal();
+                        return;
+                    }
+
+                    if (cmd === 'exit' || cmd === 'quit') {
+                        this.terminalLoading = false;
+                        this.closeTerminalTab(this.terminalActiveTab);
                         return;
                     }
 
@@ -1778,39 +2270,41 @@
                         const res = await this.apiReq({
                             action: 'terminal_exec',
                             cmd: cmd,
-                            cwd: this.terminalCwd
+                            cwd: cmdCwd
                         });
 
                         if (res) {
                             if (res.cwd) {
+                                tab.cwd = res.cwd;
                                 this.terminalCwd = res.cwd;
                             }
+                            if (res.user) this.terminalUser = res.user;
+                            if (res.hostname) this.terminalHost = res.hostname;
+
                             if (res.stdout) {
-                                this.terminalLogs.push({ type: 'stdout', text: res.stdout });
+                                tab.logs.push({ type: 'stdout', text: res.stdout });
                             }
                             if (res.stderr) {
-                                this.terminalLogs.push({ type: 'stderr', text: res.stderr });
+                                tab.logs.push({ type: 'stderr', text: res.stderr });
                             }
                             if (res.error && !res.stdout && !res.stderr) {
-                                this.terminalLogs.push({ type: 'error', text: res.error });
+                                tab.logs.push({ type: 'error', text: res.error });
                             }
                             if (typeof res.exit_code !== 'undefined' && res.exit_code !== 0) {
-                                this.terminalLogs.push({ type: 'info', text: '[Process completed with exit code ' + res.exit_code + ']' });
+                                tab.logs.push({ type: 'exit-info', exitCode: res.exit_code });
                             }
-                            if (res.success && (cmd.startsWith('mkdir') || cmd.startsWith('touch') || cmd.startsWith('rm') || cmd.startsWith('git pull') || cmd.startsWith('mv') || cmd.startsWith('cp'))) {
+                            if (res.success && (cmd.startsWith('mkdir') || cmd.startsWith('touch') || cmd.startsWith('rm') || cmd.startsWith('git pull') || cmd.startsWith('mv') || cmd.startsWith('cp') || cmd.startsWith('unzip'))) {
                                 this.fetchFiles(this.currentPath);
                             }
                         } else {
-                            this.terminalLogs.push({ type: 'error', text: 'Error: No response or execution failed.' });
+                            tab.logs.push({ type: 'error', text: 'Error: No response or execution failed.' });
                         }
                     } catch(e) {
-                        this.terminalLogs.push({ type: 'error', text: 'Error: ' + (e.message || e) });
+                        tab.logs.push({ type: 'error', text: 'Error: ' + (e.message || e) });
                     } finally {
                         this.terminalLoading = false;
                         this.scrollTerminal();
-                        this.$nextTick(() => {
-                            if (this.$refs.terminalCmdInput) this.$refs.terminalCmdInput.focus();
-                        });
+                        this.focusTerminal();
                     }
                 }
             }));
